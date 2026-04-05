@@ -23,10 +23,19 @@ RUN cp /etc/apt/sources.list /etc/apt/sources.list.bak && \
     echo "deb ${APT_SOURCE} jammy-security main restricted universe multiverse"; \
     } > /etc/apt/sources.list
 
-# Install systemctl
+# Install systemctl, SSHD, and sudo
 RUN apt-get update && \
-    apt-get install -y -o Dpkg::Options::="--force-confdef" systemd && \
+    apt-get install -y -o Dpkg::Options::="--force-confdef" systemd openssh-server sudo && \
     apt-get clean
+
+# Configure SSH for platform access
+RUN mkdir /var/run/sshd && \
+    echo 'root:root' | chpasswd && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/session\s*required\s*pam_loginuid.so/session optional pam_loginuid.so/g' /etc/pam.d/sshd
+
+# Ensure sudo works without password for root/platform scripts
+RUN echo "root ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Install tini
 RUN apt-get update && \
