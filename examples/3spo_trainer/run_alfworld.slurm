@@ -33,6 +33,8 @@ export NCCL_SHM_DISABLE=1
 export VLLM_SKIP_P2P_CHECK=1
 # 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
 export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
+# 强制导出环境变量给 Ray Actor (关键！)
+export RAY_EXPORT_CUDA_VISIBLE_DEVICES=1
 # 某些集群需要强制禁用 IB 通信来配合 MIG，如果报错继续，请取消下面这行的注释
 export NCCL_IB_DISABLE=1 
 
@@ -45,11 +47,14 @@ echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi -L
 
 # 在某些集群上，SLURM 给的是索引 (0,1,2,3) 但在 MIG 开启时 PyTorch 需要真实的 MIG UUID
-# 我们根据 nvidia-smi -L 提取真实的 MIG UUID 列表并覆盖 CUDA_VISIBLE_DEVICES
-REAL_MIG_UUIDS=$(nvidia-smi -L | grep MIG | awk '{print $NF}' | tr -d ')' | paste -sd "," -)
+# 我们使用更健壮的方式提取 MIG UUID
+REAL_MIG_UUIDS=$(nvidia-smi -L | grep -o 'MIG-[^)]*' | paste -sd "," -)
 if [ ! -z "$REAL_MIG_UUIDS" ]; then
-    echo "DEBUG: Overriding CUDA_VISIBLE_DEVICES with MIG UUIDs: $REAL_MIG_UUIDS"
+    echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
     export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+    echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+else
+    echo "DEBUG: No MIG UUIDs detected by nvidia-smi -L"
 fi
 # --- MIG 环境关键修复结束 ---
 # 确保旧的 Ray 进程不会带着旧变量残留

@@ -47,7 +47,9 @@ def run_ppo(config) -> None:
         print(f"ray init kwargs: {ray_init_kwargs}")
         ray.init(**OmegaConf.to_container(ray_init_kwargs))
 
-    runner = TaskRunner.remote()
+    # TaskRunner needs to see GPU environment variables to correctly 
+    # configure worker groups in MIG environments.
+    runner = TaskRunner.options(num_gpus=0.001).remote()
     ray.get(runner.run.remote(config))
 
 

@@ -11,9 +11,8 @@ import ray
 
 @hydra.main(config_path="../verl/trainer/config", config_name="ppo_trainer", version_base=None)
 def main(config):
-    # This script extends main_ppo to use 3SPO Trajectory Collector
-    if not ray.is_initialized():
-        ray.init()
+    # run_ppo will handle ray initialization with the correct runtime_env
+    # which is critical for MIG environments.
     
     # Custom 3SPO setup
     local_path = config.actor_rollout_ref.model.path

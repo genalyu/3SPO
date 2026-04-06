@@ -31,16 +31,22 @@ echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi -L
 
 # 在某些集群上，SLURM 给的是索引 (0,1,2,3) 但在 MIG 开启时 PyTorch 需要真实的 MIG UUID
-REAL_MIG_UUIDS=$(nvidia-smi -L | grep MIG | awk '{print $NF}' | tr -d ')' | paste -sd "," -)
+# 我们使用更健壮的方式提取 MIG UUID
+REAL_MIG_UUIDS=$(nvidia-smi -L | grep -o 'MIG-[^)]*' | paste -sd "," -)
 if [ ! -z "$REAL_MIG_UUIDS" ]; then
-    echo "DEBUG: Overriding CUDA_VISIBLE_DEVICES with MIG UUIDs: $REAL_MIG_UUIDS"
+    echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
     export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+    echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+else
+    echo "DEBUG: No MIG UUIDs detected by nvidia-smi -L"
 fi
 
 # 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
 export VLLM_SKIP_P2P_CHECK=1
 # 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
 export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
+# 强制导出环境变量给 Ray Actor (关键！)
+export RAY_EXPORT_CUDA_VISIBLE_DEVICES=1
 # 强制禁用导致 MIG 环境下 NCCL 报错的 IB/P2P/SHM 通信
 export NCCL_P2P_DISABLE=1
 export NCCL_SHM_DISABLE=1

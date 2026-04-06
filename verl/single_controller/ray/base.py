@@ -332,6 +332,12 @@ class RayWorkerGroup(WorkerGroup):
         # This is important for MIG environments where fractional GPUs 
         # can cause IndexError in Ray's resource manager.
         num_gpus = 1.0 / resource_pool.max_colocate_count
+        
+        # In MIG environments, the driver process (TaskRunner) must see 
+        # CUDA_VISIBLE_DEVICES to pass them to workers.
+        if use_gpu and self.device_name == "cuda":
+            if not os.environ.get("CUDA_VISIBLE_DEVICES"):
+                logging.warning(f"RayWorkerGroup {self.name_prefix}: CUDA_VISIBLE_DEVICES is empty in TaskRunner! Workers might not see GPUs.")
 
         rank = -1
         local_world_size = resource_pool.store[0]
