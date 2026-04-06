@@ -31,7 +31,7 @@ export VLLM_SKIP_P2P_CHECK=1
 # 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
 export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
 # 某些集群需要强制禁用 IB 通信来配合 MIG，如果报错继续，请取消下面这行的注释
-# export NCCL_IB_DISABLE=1 
+export NCCL_IB_DISABLE=1 
 
 # 开启 NCCL 调试日志，如果出错，日志里会告诉你具体是哪两张卡在打架
 export NCCL_DEBUG=INFO 

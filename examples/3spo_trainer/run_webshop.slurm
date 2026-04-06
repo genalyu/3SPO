@@ -26,6 +26,10 @@ export HF_ENDPOINT=https://hf-mirror.com
 export VLLM_SKIP_P2P_CHECK=1
 # 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
 export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
+# 强制禁用导致 MIG 环境下 NCCL 报错的 IB/P2P/SHM 通信
+export NCCL_P2P_DISABLE=1
+export NCCL_SHM_DISABLE=1
+export NCCL_IB_DISABLE=1
 
 # 确保旧的 Ray 进程不会带着旧变量残留
 ray stop --force

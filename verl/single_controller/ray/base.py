@@ -337,10 +337,13 @@ class RayWorkerGroup(WorkerGroup):
                 env_vars = {
                     "WORLD_SIZE": str(world_size),
                     "RANK": str(rank),
+                    "LOCAL_RANK": str(local_rank),
+                    "LOCAL_WORLD_SIZE": str(local_world_size),
                     "WG_PREFIX": self.name_prefix,
                     "WG_BACKEND": "ray",
                     "RAY_LOCAL_WORLD_SIZE": str(local_world_size),
                     "RAY_LOCAL_RANK": str(local_rank),
+                    "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
                 }
                 if rank != 0:
                     env_vars["MASTER_ADDR"] = self._master_addr
