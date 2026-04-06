@@ -324,7 +324,11 @@ class RayWorkerGroup(WorkerGroup):
         world_size = resource_pool.world_size
         self._world_size = world_size
         # cia.add_kwarg("_world_size", world_size)
-        num_gpus = 1 / resource_pool.max_colocate_count
+        
+        # When max_colocate_count=1, num_gpus will be 1.0.
+        # This is important for MIG environments where fractional GPUs 
+        # can cause IndexError in Ray's resource manager.
+        num_gpus = 1.0 / resource_pool.max_colocate_count
 
         rank = -1
         local_world_size = resource_pool.store[0]
