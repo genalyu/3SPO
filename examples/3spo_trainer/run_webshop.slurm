@@ -5,8 +5,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:2
 #SBATCH --mem=64G
-#SBATCH --time=24:00:00
-#SBATCH --partition=gpu2
+#SBATCH --partition=H200
 #SBATCH --output=logs/%j_webshop.out
 #SBATCH --error=logs/%j_webshop.err
 
