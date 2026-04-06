@@ -2,9 +2,9 @@
 #SBATCH --job-name=3spo_alfworld
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
-#SBATCH --gres=gpu:2
-#SBATCH --mem=64G
+#SBATCH --cpus-per-task=32
+#SBATCH --gres=gpu:4
+#SBATCH --mem=512G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_alfworld.out
 #SBATCH --error=logs/%j_alfworld.err
@@ -32,10 +32,10 @@ beta=5.0
 omega_k=0.1
 
 # 2. Data Preparation
-python3 -m examples.data_preprocess.prepare \
-    --mode 'text' \
-    --train_data_size $train_data_size \
-    --val_data_size $val_data_size
+# python3 -m examples.data_preprocess.prepare \
+#     --mode 'text' \
+#     --train_data_size $train_data_size \
+#     --val_data_size $val_data_size
 
 # 3. Launch 3SPO Training
 python3 -m gigpo.main_3spo \
