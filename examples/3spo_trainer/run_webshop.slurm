@@ -17,7 +17,9 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONUNBUFFERED=1
 export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+# export CUDA_VISIBLE_DEVICES=0,1,2,3
+unset CUDA_VISIBLE_DEVICES
+unset HIP_VISIBLE_DEVICES
 num_cpus_per_env_worker=0.1
 HOME=/public/home/genalyu
 train_data_size=16
