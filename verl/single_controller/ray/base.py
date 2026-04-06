@@ -374,7 +374,7 @@ class RayWorkerGroup(WorkerGroup):
                         # But with num_gpus=0.001, we want PyTorch to see this as 'cuda:0'
                 
                 # Debug: Log the env vars being passed
-                # print(f"DEBUG: Rank {rank} Local Rank {local_rank} env_vars: {env_vars}")
+                print(f"DEBUG: Rank {rank} Local Rank {local_rank} env_vars: {env_vars}", flush=True)
                 if rank != 0:
                     env_vars["MASTER_ADDR"] = self._master_addr
                     env_vars["MASTER_PORT"] = self._master_port
