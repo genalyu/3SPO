@@ -51,8 +51,10 @@ echo "Skipping automatic download. Please ensure files are placed in agent_syste
 cd ..
 
 # Download spaCy large NLP model
-python -m spacy download en_core_web_lg
-python -m spacy download en_core_web_sm
+# python -m spacy download en_core_web_lg
+# python -m spacy download en_core_web_sm
+pip install data/en_core_web_lg-3.7.1.tar.gz
+pip install data/en_core_web_sm-3.7.1.tar
 
 # Build search engine index
 cd search_engine
