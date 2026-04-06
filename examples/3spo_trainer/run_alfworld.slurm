@@ -40,7 +40,6 @@ export NCCL_DEBUG=INFO
 # 确保旧的 Ray 进程不会带着旧变量残留
 ray stop --force
 
-HOME=/public/home/genalyu
 ENGINE=${1:-vllm}
 num_cpus_per_env_worker=0.1
 

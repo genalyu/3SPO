@@ -213,11 +213,12 @@ class RayClassWithInitArgs(ClassWithInitArgs):
         options.update(self._options)
 
         if use_gpu and device_name == "cuda":
-            # For MIG environments, Ray's internal resource isolation (num_gpus > 0) 
-            # can lead to IndexError and TimeoutError. We rely on manually setting
-            # LOCAL_RANK and CUDA_VISIBLE_DEVICES in env_vars instead.
-            # Thus we set num_gpus=0 for the actor options to bypass Ray isolation.
-            options["num_gpus"] = 0
+            # In MIG environments, setting num_gpus to a very small positive 
+            # value helps Ray preserve GPU environments while bypassing its 
+            # broken index-based resource isolation (IndexError).
+            # For standard environments, we use the requested num_gpus.
+            is_mig = "MIG-" in os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            options["num_gpus"] = 0.001 if is_mig else num_gpus
         if use_gpu and device_name == "npu":
             options["resources"] = {"NPU": num_gpus}
 
@@ -354,12 +355,22 @@ class RayWorkerGroup(WorkerGroup):
                     "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
                     # For Ray 2.10+, setting this to 0 prevents Ray from unsetting 
                     # CUDA_VISIBLE_DEVICES when num_gpus=0 is requested.
-                    "RAY_EXPORT_CUDA_VISIBLE_DEVICES": "0",
+                    "RAY_EXPORT_CUDA_VISIBLE_DEVICES": "1", # Changed to 1 to force export
                     # Explicitly unset AMD and NPU specific variables to avoid conflicts
                     "HIP_VISIBLE_DEVICES": "",
                     "ROCR_VISIBLE_DEVICES": "",
                     "ASCEND_VISIBLE_DEVICES": "",
                 }
+                
+                # Manual MIG isolation: pick only the UUID for this local rank
+                cvd_val = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+                if cvd_val:
+                    cvd_list = cvd_val.split(",")
+                    if len(cvd_list) > local_rank:
+                        # Assign only the specific MIG partition to this rank
+                        env_vars["CUDA_VISIBLE_DEVICES"] = cvd_list[local_rank]
+                        # Some frameworks use these as fallback
+                        env_vars["NVIDIA_VISIBLE_DEVICES"] = cvd_list[local_rank]
                 if rank != 0:
                     env_vars["MASTER_ADDR"] = self._master_addr
                     env_vars["MASTER_PORT"] = self._master_port
