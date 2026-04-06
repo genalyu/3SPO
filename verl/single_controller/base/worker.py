@@ -266,8 +266,15 @@ class Worker(WorkerHelper):
             # so we need to set local rank when the flag is set.
             device_name = "NPU" if is_npu_available else "GPU"
             local_rank = ray.get_runtime_context().get_accelerator_ids()[device_name][0]
-            os.environ["LOCAL_RANK"] = local_rank
-            get_torch_device().set_device(int(local_rank))
+            os.environ["LOCAL_RANK"] = str(local_rank)
+            # In MIG environments, local_rank might be a UUID string.
+            # We should only call set_device if it's an integer.
+            try:
+                get_torch_device().set_device(int(local_rank))
+            except ValueError:
+                # If local_rank is a UUID, we don't need to call set_device(int)
+                # as the visibility is already restricted by CUDA_VISIBLE_DEVICES
+                pass
 
     def _configure_with_store(self, store: Dict):
         """
