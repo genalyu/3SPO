@@ -15,6 +15,39 @@
 import importlib
 import logging
 import os
+
+
+def patch_vllm_device_id_to_physical_device_id():
+    """Monkey-patch vLLM's device_id_to_physical_device_id to handle MIG UUIDs.
+    See https://github.com/vllm-project/vllm/issues/13815
+    """
+    try:
+        import vllm.platforms.interface as vllm_interface
+
+        def patched_fn(device_id):
+            try:
+                return int(device_id)
+            except (ValueError, TypeError):
+                # In MIG environment, device_id can be a string like 'MIG-xxx'
+                # vLLM expects an int here, but we return the string as is.
+                return device_id
+
+        if hasattr(vllm_interface, 'device_id_to_physical_device_id'):
+            vllm_interface.device_id_to_physical_device_id = patched_fn
+
+        # For newer vLLM versions (e.g., 0.7.2+), it might be a method of Platform or subclasses
+        try:
+            from vllm.platforms.cuda import CudaPlatform
+            if hasattr(CudaPlatform, 'device_id_to_physical_device_id'):
+                CudaPlatform.device_id_to_physical_device_id = staticmethod(patched_fn)
+        except (ImportError, AttributeError):
+            pass
+
+    except (ImportError, AttributeError):
+        pass
+
+
+patch_vllm_device_id_to_physical_device_id()
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as get_version
 
