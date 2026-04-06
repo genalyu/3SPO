@@ -41,6 +41,14 @@ export NCCL_DEBUG=INFO
 echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
 echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi -L
+
+# 在某些集群上，SLURM 给的是索引 (0,1,2,3) 但在 MIG 开启时 PyTorch 需要真实的 MIG UUID
+# 我们根据 nvidia-smi -L 提取真实的 MIG UUID 列表并覆盖 CUDA_VISIBLE_DEVICES
+REAL_MIG_UUIDS=$(nvidia-smi -L | grep MIG | awk '{print $NF}' | tr -d ')' | paste -sd "," -)
+if [ ! -z "$REAL_MIG_UUIDS" ]; then
+    echo "DEBUG: Overriding CUDA_VISIBLE_DEVICES with MIG UUIDs: $REAL_MIG_UUIDS"
+    export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+fi
 # --- MIG 环境关键修复结束 ---
 # 确保旧的 Ray 进程不会带着旧变量残留
 ray stop --force

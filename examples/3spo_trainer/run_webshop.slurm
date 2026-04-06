@@ -23,6 +23,18 @@ unset ROCR_VISIBLE_DEVICES
 unset ASCEND_VISIBLE_DEVICES
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
 
+# 调试：打印环境中的 GPU 变量
+echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
+echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+nvidia-smi -L
+
+# 在某些集群上，SLURM 给的是索引 (0,1,2,3) 但在 MIG 开启时 PyTorch 需要真实的 MIG UUID
+REAL_MIG_UUIDS=$(nvidia-smi -L | grep MIG | awk '{print $NF}' | tr -d ')' | paste -sd "," -)
+if [ ! -z "$REAL_MIG_UUIDS" ]; then
+    echo "DEBUG: Overriding CUDA_VISIBLE_DEVICES with MIG UUIDs: $REAL_MIG_UUIDS"
+    export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+fi
+
 # 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
 export VLLM_SKIP_P2P_CHECK=1
 # 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
