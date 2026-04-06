@@ -41,25 +41,18 @@ is_npu_available = is_torch_npu_available()
 def get_visible_devices_keyword() -> str:
     """Function that gets visible devices keyword name.
     Returns:
-        'CUDA_VISIBLE_DEVICES' or `ASCEND_RT_VISIBLE_DEVICES`
+        'CUDA_VISIBLE_DEVICES'
     """
-    if get_is_cuda_available():
-        return "CUDA_VISIBLE_DEVICES"
-    elif get_is_npu_available():
-        return "ASCEND_RT_VISIBLE_DEVICES"
     return "CUDA_VISIBLE_DEVICES"
 
 
 def get_device_name() -> str:
     """Function that gets the torch.device based on the current machine.
-    This currently only supports CPU, CUDA, NPU.
     Returns:
         device
     """
     if get_is_cuda_available():
         device = "cuda"
-    elif get_is_npu_available():
-        device = "npu"
     else:
         device = "cpu"
     return device
@@ -87,17 +80,11 @@ def get_device_id() -> int:
 
 
 def get_nccl_backend() -> str:
-    """Return nccl backend type based on the device type.
+    """Return nccl backend type.
     Returns:
         nccl backend type string.
     """
-    if get_is_cuda_available():
-        return "nccl"
-    elif get_is_npu_available():
-        return "hccl"
-    else:
-        # Fallback to gloo for CPU
-        return "gloo"
+    return "nccl"
 
 
 def set_expandable_segments(enable: bool) -> None:
