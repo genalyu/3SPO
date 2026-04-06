@@ -19,7 +19,7 @@ export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 num_cpus_per_env_worker=0.1
-
+HOME=/public/home/genalyu
 train_data_size=16
 val_data_size=128
 group_size=8
@@ -93,6 +93,7 @@ python3 -m gigpo.main_3spo \
     trainer.experiment_name='3spo_qwen2.5_1.5b_slurm' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
+    trainer.default_local_dir=$HOME/project/verl-agent/checkpoints/webshop/$SLURM_JOB_ID \
     trainer.save_freq=100 \
     trainer.test_freq=200 \
     trainer.total_epochs=400 \
