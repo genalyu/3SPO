@@ -91,9 +91,9 @@ python3 -m gigpo.main_3spo \
     trainer.logger=['console','wandb'] \
     trainer.project_name='verl_agent_alfworld' \
     trainer.experiment_name='3spo_qwen2.5_1.5b_slurm' \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
-    trainer.save_freq=-1 \
-    trainer.test_freq=5 \
-    trainer.total_epochs=150 \
+    trainer.save_freq=100 \
+    trainer.test_freq=200 \
+    trainer.total_epochs=400 \
     trainer.val_before_train=True
