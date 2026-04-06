@@ -213,7 +213,11 @@ class RayClassWithInitArgs(ClassWithInitArgs):
         options.update(self._options)
 
         if use_gpu and device_name == "cuda":
-            options["num_gpus"] = num_gpus
+            # For MIG environments, Ray's internal resource isolation (num_gpus > 0) 
+            # can lead to IndexError and TimeoutError. We rely on manually setting
+            # LOCAL_RANK and CUDA_VISIBLE_DEVICES in env_vars instead.
+            # Thus we set num_gpus=0 for the actor options to bypass Ray isolation.
+            options["num_gpus"] = 0
         if use_gpu and device_name == "npu":
             options["resources"] = {"NPU": num_gpus}
 
