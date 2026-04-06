@@ -32,10 +32,10 @@ beta=5.0
 omega_k=0.1
 
 # 2. Data Preparation
-python3 -m examples.data_preprocess.prepare \
-    --mode 'text' \
-    --train_data_size $train_data_size \
-    --val_data_size $((val_data_size * 2))
+# python3 -m examples.data_preprocess.prepare \
+#     --mode 'text' \
+#     --train_data_size $train_data_size \
+#     --val_data_size $((val_data_size * 2))
 
 # 3. Launch 3SPO Training
 python3 -m gigpo.main_3spo \
