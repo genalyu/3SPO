@@ -21,8 +21,10 @@ def initialize_global_process_group(timeout_second=36000):
     from datetime import timedelta
 
     import torch.distributed
+    from verl.utils.device import get_nccl_backend
 
-    torch.distributed.init_process_group("nccl" if is_cuda_available else "hccl", timeout=timedelta(seconds=timeout_second))
+    backend = get_nccl_backend()
+    torch.distributed.init_process_group(backend, timeout=timedelta(seconds=timeout_second))
     local_rank = int(os.environ["LOCAL_RANK"])
     rank = int(os.environ["RANK"])
     world_size = int(os.environ["WORLD_SIZE"])

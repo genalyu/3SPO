@@ -352,9 +352,10 @@ class RayWorkerGroup(WorkerGroup):
                     "RAY_LOCAL_WORLD_SIZE": str(local_world_size),
                     "RAY_LOCAL_RANK": str(local_rank),
                     "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
-                    # Explicitly unset AMD-specific variables to avoid conflicts in vLLM
+                    # Explicitly unset AMD and NPU specific variables to avoid conflicts
                     "HIP_VISIBLE_DEVICES": "",
                     "ROCR_VISIBLE_DEVICES": "",
+                    "ASCEND_VISIBLE_DEVICES": "",
                 }
                 if rank != 0:
                     env_vars["MASTER_ADDR"] = self._master_addr

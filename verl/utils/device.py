@@ -21,10 +21,19 @@ def is_torch_npu_available() -> bool:
         import torch_npu  # noqa: F401
 
         return torch.npu.is_available()
-    except ImportError:
+    except (ImportError, AttributeError):
         return False
 
 
+def get_is_cuda_available():
+    return torch.cuda.is_available()
+
+
+def get_is_npu_available():
+    return is_torch_npu_available()
+
+
+# For backward compatibility
 is_cuda_available = torch.cuda.is_available()
 is_npu_available = is_torch_npu_available()
 
@@ -34,7 +43,11 @@ def get_visible_devices_keyword() -> str:
     Returns:
         'CUDA_VISIBLE_DEVICES' or `ASCEND_RT_VISIBLE_DEVICES`
     """
-    return "CUDA_VISIBLE_DEVICES" if is_cuda_available else "ASCEND_RT_VISIBLE_DEVICES"
+    if get_is_cuda_available():
+        return "CUDA_VISIBLE_DEVICES"
+    elif get_is_npu_available():
+        return "ASCEND_RT_VISIBLE_DEVICES"
+    return "CUDA_VISIBLE_DEVICES"
 
 
 def get_device_name() -> str:
@@ -43,9 +56,9 @@ def get_device_name() -> str:
     Returns:
         device
     """
-    if is_cuda_available:
+    if get_is_cuda_available():
         device = "cuda"
-    elif is_npu_available:
+    elif get_is_npu_available():
         device = "npu"
     else:
         device = "cpu"
@@ -78,12 +91,13 @@ def get_nccl_backend() -> str:
     Returns:
         nccl backend type string.
     """
-    if is_cuda_available:
+    if get_is_cuda_available():
         return "nccl"
-    elif is_npu_available:
+    elif get_is_npu_available():
         return "hccl"
     else:
-        raise RuntimeError(f"No available nccl backend found on device type {get_device_name()}.")
+        # Fallback to gloo for CPU
+        return "gloo"
 
 
 def set_expandable_segments(enable: bool) -> None:
