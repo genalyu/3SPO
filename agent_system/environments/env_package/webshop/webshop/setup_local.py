@@ -2,7 +2,7 @@ import gdown
 import os
 
 # 目标保存目录
-save_dir = "./webshop_data"
+save_dir = "/Users/a1-6/webshop_data"
 os.makedirs(save_dir, exist_ok=True)
 
 # WebShop 核心数据文件列表 (来自 setup.sh)
