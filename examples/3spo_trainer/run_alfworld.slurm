@@ -15,6 +15,8 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONUNBUFFERED=1
 export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
 ENGINE=${1:-vllm}
 num_cpus_per_env_worker=0.1
 
