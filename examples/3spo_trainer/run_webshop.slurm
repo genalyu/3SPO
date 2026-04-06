@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --mem=64G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_webshop.out
@@ -18,9 +18,15 @@ export PYTHONUNBUFFERED=1
 export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
-unset CUDA_VISIBLE_DEVICES
-unset HIP_VISIBLE_DEVICES
-unset ROCR_VISIBLE_DEVICES  # 重点清除这一项
+# unset CUDA_VISIBLE_DEVICES
+# unset HIP_VISIBLE_DEVICES
+# unset ROCR_VISIBLE_DEVICES  # 重点清除这一项
+
+# 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
+export VLLM_SKIP_P2P_CHECK=1
+# 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
+export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
+
 # 确保旧的 Ray 进程不会带着旧变量残留
 ray stop --force
 num_cpus_per_env_worker=0.1

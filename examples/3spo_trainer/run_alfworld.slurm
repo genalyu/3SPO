@@ -22,9 +22,14 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 # 因为 MIG 实例之间在物理上无法直接 P2P 访问
 export NCCL_P2P_DISABLE=1
 export NCCL_SHM_DISABLE=1
-unset CUDA_VISIBLE_DEVICES
-unset HIP_VISIBLE_DEVICES
-unset ROCR_VISIBLE_DEVICES  # 重点清除这一项
+# unset CUDA_VISIBLE_DEVICES
+# unset HIP_VISIBLE_DEVICES
+# unset ROCR_VISIBLE_DEVICES  # 重点清除这一项
+
+# 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
+export VLLM_SKIP_P2P_CHECK=1
+# 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
+export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
 # 某些集群需要强制禁用 IB 通信来配合 MIG，如果报错继续，请取消下面这行的注释
 # export NCCL_IB_DISABLE=1 
 
