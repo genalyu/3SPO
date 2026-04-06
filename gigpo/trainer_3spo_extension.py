@@ -15,7 +15,7 @@
 import torch
 import numpy as np
 from typing import List, Dict, Any
-from .core_3spo import StateScoreManager, compute_3spo_step_reward, get_n_rollouts, to_hashable
+from .core_3spo import StateScoreManager, compute_3spo_step_reward, to_hashable
 from agent_system.multi_turn_rollout.rollout_loop import TrajectoryCollector
 
 class SPO3TrajectoryCollector(TrajectoryCollector):
