@@ -216,9 +216,7 @@ class RayClassWithInitArgs(ClassWithInitArgs):
             # In MIG environments, setting num_gpus to a very small positive 
             # value helps Ray preserve GPU environments while bypassing its 
             # broken index-based resource isolation (IndexError).
-            # For standard environments, we use the requested num_gpus.
-            is_mig = "MIG-" in os.environ.get("CUDA_VISIBLE_DEVICES", "")
-            options["num_gpus"] = 0.001 if is_mig else num_gpus
+            options["num_gpus"] = 0.001
         if use_gpu and device_name == "npu":
             options["resources"] = {"NPU": num_gpus}
 
@@ -371,6 +369,12 @@ class RayWorkerGroup(WorkerGroup):
                         env_vars["CUDA_VISIBLE_DEVICES"] = cvd_list[local_rank]
                         # Some frameworks use these as fallback
                         env_vars["NVIDIA_VISIBLE_DEVICES"] = cvd_list[local_rank]
+                        # For vLLM/PyTorch, sometimes using MIG UUID is not enough 
+                        # if the index-based mapping is expected.
+                        # But with num_gpus=0.001, we want PyTorch to see this as 'cuda:0'
+                
+                # Debug: Log the env vars being passed
+                # print(f"DEBUG: Rank {rank} Local Rank {local_rank} env_vars: {env_vars}")
                 if rank != 0:
                     env_vars["MASTER_ADDR"] = self._master_addr
                     env_vars["MASTER_PORT"] = self._master_port

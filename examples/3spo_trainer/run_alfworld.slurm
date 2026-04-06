@@ -36,6 +36,11 @@ export NCCL_IB_DISABLE=1
 
 # 开启 NCCL 调试日志，如果出错，日志里会告诉你具体是哪两张卡在打架
 export NCCL_DEBUG=INFO 
+
+# 调试：打印环境中的 GPU 变量
+echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
+echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+nvidia-smi -L
 # --- MIG 环境关键修复结束 ---
 # 确保旧的 Ray 进程不会带着旧变量残留
 ray stop --force
