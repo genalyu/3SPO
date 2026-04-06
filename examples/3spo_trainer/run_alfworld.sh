@@ -1,5 +1,7 @@
 #!/bin/bash
 set -x
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate verl-agent-alf
 ENGINE=${1:-vllm}
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
@@ -40,7 +42,7 @@ python3 -m gigpo.main_3spo \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     data.return_raw_chat=True \
-    actor_rollout_ref.model.path=$model_path \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=256 \
@@ -79,5 +81,5 @@ python3 -m gigpo.main_3spo \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
     trainer.test_freq=200 \
-    trainer.total_epochs=400 \
+    trainer.total_epochs=150 \
     trainer.val_before_train=True $@

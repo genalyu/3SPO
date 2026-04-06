@@ -11,6 +11,8 @@
 
 # 1. Environment Setup
 set -x
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate verl-agent-alf
 ENGINE=${1:-vllm}
 ulimit -u 65536
 export VLLM_ATTENTION_BACKEND=XFORMERS
