@@ -17,6 +17,7 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONUNBUFFERED=1
 export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 num_cpus_per_env_worker=0.1
 
 train_data_size=16
@@ -55,7 +56,7 @@ python3 -m gigpo.main_3spo \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     data.return_raw_chat=True \
-    actor_rollout_ref.model.path=$model_path \
+    actor_rollout_ref.model.path=
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=64 \
