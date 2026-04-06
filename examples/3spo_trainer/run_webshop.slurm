@@ -17,10 +17,11 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 export PYTHONUNBUFFERED=1
 export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
+# 在 NVIDIA 环境下，显式清除 AMD 特有的 ROCR/HIP 变量，防止 vLLM 冲突报错
+# 但要保留 CUDA_VISIBLE_DEVICES (SLURM 分配的 MIG UUIDs)
+unset HIP_VISIBLE_DEVICES
+unset ROCR_VISIBLE_DEVICES
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
-# unset CUDA_VISIBLE_DEVICES
-# unset HIP_VISIBLE_DEVICES
-# unset ROCR_VISIBLE_DEVICES  # 重点清除这一项
 
 # 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
 export VLLM_SKIP_P2P_CHECK=1
