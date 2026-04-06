@@ -16,10 +16,21 @@ export PYTHONUNBUFFERED=1
 export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+
+# 彻底禁用导致 "Duplicate GPU" 报错的 P2P 通信和共享内存
+# 因为 MIG 实例之间在物理上无法直接 P2P 访问
+export NCCL_P2P_DISABLE=1
+export NCCL_SHM_DISABLE=1
 unset CUDA_VISIBLE_DEVICES
 unset HIP_VISIBLE_DEVICES
 unset ROCR_VISIBLE_DEVICES  # 重点清除这一项
+# 某些集群需要强制禁用 IB 通信来配合 MIG，如果报错继续，请取消下面这行的注释
+# export NCCL_IB_DISABLE=1 
 
+# 开启 NCCL 调试日志，如果出错，日志里会告诉你具体是哪两张卡在打架
+export NCCL_DEBUG=INFO 
+# --- MIG 环境关键修复结束 ---
 # 确保旧的 Ray 进程不会带着旧变量残留
 ray stop --force
 
