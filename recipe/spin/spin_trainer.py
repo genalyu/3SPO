@@ -111,7 +111,8 @@ class ResourcePoolManager:
         total_available_gpus = sum(node_available_gpus.values())
         total_required_gpus = sum(
             [n_gpus for process_on_nodes in self.resource_pool_spec.values() for n_gpus in process_on_nodes])
-        if total_available_gpus < total_required_gpus:
+        # Add a small epsilon (0.1) to handle floating point precision issues (e.g., 3.999 < 4)
+        if total_available_gpus + 0.1 < total_required_gpus:
             raise ValueError(
                 f"Total available GPUs {total_available_gpus} is less than total desired GPUs {total_required_gpus}")
 
@@ -119,7 +120,7 @@ class ResourcePoolManager:
         for resource_pool_name, process_on_nodes in self.resource_pool_spec.items():
             num_gpus, num_nodes = process_on_nodes[0], len(process_on_nodes)
             for node, available_gpus in node_available_gpus.items():
-                if available_gpus >= num_gpus:
+                if available_gpus + 0.1 >= num_gpus:
                     node_available_gpus[node] -= num_gpus
                     num_nodes -= 1
                     if num_nodes == 0:
