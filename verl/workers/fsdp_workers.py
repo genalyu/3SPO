@@ -111,6 +111,7 @@ class ActorRolloutRefWorker(Worker):
         if not torch.distributed.is_initialized():
             rank = int(os.environ.get("RANK", 0))
             world_size = int(os.environ.get("WORLD_SIZE", 1))
+            # Dynamic check to ensure GPUs are visible before init
             torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
         # build device mesh for FSDP

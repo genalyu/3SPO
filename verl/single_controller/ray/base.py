@@ -352,6 +352,9 @@ class RayWorkerGroup(WorkerGroup):
                     "RAY_LOCAL_WORLD_SIZE": str(local_world_size),
                     "RAY_LOCAL_RANK": str(local_rank),
                     "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
+                    # For Ray 2.10+, setting this to 0 prevents Ray from unsetting 
+                    # CUDA_VISIBLE_DEVICES when num_gpus=0 is requested.
+                    "RAY_EXPORT_CUDA_VISIBLE_DEVICES": "0",
                     # Explicitly unset AMD and NPU specific variables to avoid conflicts
                     "HIP_VISIBLE_DEVICES": "",
                     "ROCR_VISIBLE_DEVICES": "",

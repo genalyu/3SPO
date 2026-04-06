@@ -33,7 +33,9 @@ def get_is_npu_available():
     return is_torch_npu_available()
 
 
-# For backward compatibility
+# These are kept for backward compatibility but should be used with caution
+# as they are evaluated at import time.
+# In Ray actors, we should use get_is_cuda_available() instead.
 is_cuda_available = torch.cuda.is_available()
 is_npu_available = is_torch_npu_available()
 
