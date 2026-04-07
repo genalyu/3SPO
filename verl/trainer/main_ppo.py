@@ -67,17 +67,23 @@ class TaskRunner:
         OmegaConf.resolve(config)
 
         # download the checkpoint from hdfs
+        print(f"Step: Copying model from {config.actor_rollout_ref.model.path} to local...")
         local_path = copy_to_local(config.actor_rollout_ref.model.path, use_shm=config.actor_rollout_ref.model.get("use_shm", False))
+        print(f"Step: Model copied to {local_path}")
 
         from agent_system.environments import make_envs
+        print("Step: Initializing environments...")
         envs, val_envs = make_envs(config)
+        print("Step: Environments initialized.")
 
         # instantiate tokenizer
         from verl.utils import hf_processor, hf_tokenizer
 
         trust_remote_code = config.data.get("trust_remote_code", False)
+        print("Step: Initializing tokenizer and processor...")
         tokenizer = hf_tokenizer(local_path, trust_remote_code=trust_remote_code)
         processor = hf_processor(local_path, trust_remote_code=trust_remote_code, use_fast=True)  # used for multimodal LLM, could be none
+        print("Step: Tokenizer and processor initialized.")
 
         # vllm early verify
         if config.actor_rollout_ref.rollout.name in ["vllm"]:
@@ -88,6 +94,7 @@ class TaskRunner:
                     raise NotImplementedError("PPO LoRA is not supported before vllm 0.7.3")
 
         # define worker classes
+        print("Step: Defining worker classes...")
         if config.actor_rollout_ref.actor.strategy in ["fsdp", "fsdp2"]:
             assert config.critic.strategy in ["fsdp", "fsdp2"]
             from verl.single_controller.ray import RayWorkerGroup

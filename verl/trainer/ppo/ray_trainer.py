@@ -699,7 +699,9 @@ class RayPPOTrainer:
         sample_outputs = []
         sample_scores = []
 
-        for test_data in self.val_dataloader:
+        print(f"Step: Starting validation on {len(self.val_dataloader)} batches...")
+        for i, test_data in enumerate(self.val_dataloader):
+            print(f"Step: Processing validation batch {i+1}/{len(self.val_dataloader)}...")
             test_batch = DataProto.from_single_dict(test_data)
 
             # repeat test batch
@@ -747,12 +749,14 @@ class RayPPOTrainer:
             # test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
 
             ################ agent-environment loop ###############
+            print(f"Step: Running multi-turn rollout loop for validation batch {i+1}...")
             test_output_gen_batch = self.traj_collector.multi_turn_loop(
                                                     gen_batch=test_gen_batch,
                                                     actor_rollout_wg=self.actor_rollout_wg,
                                                     envs=self.val_envs,
                                                     is_train=False,
                                                     )
+            print(f"Step: Multi-turn rollout loop for validation batch {i+1} completed.")
             print('validation generation end')
             del test_batch
             test_batch = test_output_gen_batch
@@ -885,20 +889,28 @@ class RayPPOTrainer:
             all_wg.update(spawn_wg)
 
         if self.use_critic:
+            print("Step: Initializing critic model...")
             self.critic_wg = all_wg["critic"]
             self.critic_wg.init_model()
+            print("Step: Critic model initialized.")
 
         if self.use_reference_policy and not self.ref_in_actor:
+            print("Step: Initializing reference policy model...")
             self.ref_policy_wg = all_wg["ref"]
             self.ref_policy_wg.init_model()
+            print("Step: Reference policy model initialized.")
 
         if self.use_rm:
+            print("Step: Initializing reward model...")
             self.rm_wg = all_wg["rm"]
             self.rm_wg.init_model()
+            print("Step: Reward model initialized.")
 
         # we should create rollout at the end so that vllm can have a better estimation of kv cache memory
+        print("Step: Initializing actor and rollout model...")
         self.actor_rollout_wg = all_wg["actor_rollout"]
         self.actor_rollout_wg.init_model()
+        print("Step: Actor and rollout model initialized.")
 
         # create async rollout manager and request scheduler
         self.async_rollout_mode = False
@@ -1031,7 +1043,9 @@ class RayPPOTrainer:
         # perform validation before training
         # currently, we only support validation using the reward_function.
         if self.val_reward_fn is not None and self.config.trainer.get("val_before_train", True):
+            print("Step: Performing initial validation (val_before_train)...")
             val_metrics = self._validate()
+            print(f"Step: Initial validation completed. Metrics: {val_metrics}")
             assert val_metrics, f"{val_metrics=}"
             pprint(f"Initial validation metrics: {val_metrics}")
             logger.log(data=val_metrics, step=self.global_steps)
