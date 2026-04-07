@@ -40,6 +40,11 @@ def patch_vllm_device_id_to_physical_device_id():
         if hasattr(vllm_interface, 'device_id_to_physical_device_id'):
             vllm_interface.device_id_to_physical_device_id = patched_fn
 
+        for attr_name in ("Platform", "CudaPlatform", "NvmlCudaPlatform", "NonNvmlCudaPlatform"):
+            platform_cls = getattr(vllm_interface, attr_name, None)
+            if platform_cls is not None and hasattr(platform_cls, "device_id_to_physical_device_id"):
+                platform_cls.device_id_to_physical_device_id = staticmethod(patched_fn)
+
         # For newer vLLM versions (e.g., 0.7.2+), it might be a method of Platform or subclasses
         try:
             from vllm.platforms.cuda import CudaPlatform
