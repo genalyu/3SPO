@@ -265,16 +265,30 @@ class Worker(WorkerHelper):
             # RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is set,
             # so we need to set local rank when the flag is set.
             device_name = "NPU" if is_npu_available else "GPU"
-            local_rank = ray.get_runtime_context().get_accelerator_ids()[device_name][0]
-            os.environ["LOCAL_RANK"] = str(local_rank)
-            # In MIG environments, local_rank might be a UUID string.
-            # We should only call set_device if it's an integer.
-            try:
-                get_torch_device().set_device(int(local_rank))
-            except ValueError:
-                # If local_rank is a UUID, we don't need to call set_device(int)
-                # as the visibility is already restricted by CUDA_VISIBLE_DEVICES
-                pass
+            local_rank = os.environ.get("LOCAL_RANK")
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+
+            # In MIG environments we often inject CUDA_VISIBLE_DEVICES manually.
+            # Ray's accelerator_ids can be empty even though device visibility is
+            # already correctly restricted to a single MIG UUID.
+            if local_rank is None:
+                accelerator_ids = ray.get_runtime_context().get_accelerator_ids().get(device_name, [])
+                if accelerator_ids:
+                    local_rank = accelerator_ids[0]
+
+            if local_rank is not None:
+                os.environ["LOCAL_RANK"] = str(local_rank)
+
+            # If visibility is already restricted by a single MIG UUID, we should
+            # not call set_device(int) because there is no stable numeric index to
+            # recover from Ray runtime context.
+            if "MIG-" not in cuda_visible_devices:
+                try:
+                    get_torch_device().set_device(int(os.environ["LOCAL_RANK"]))
+                except (ValueError, KeyError):
+                    # If LOCAL_RANK is a UUID or otherwise not an integer, the
+                    # existing CUDA_VISIBLE_DEVICES restriction is sufficient.
+                    pass
 
     def _configure_with_store(self, store: Dict):
         """
