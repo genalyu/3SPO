@@ -113,16 +113,14 @@ class RayResourcePool(ResourcePool):
 
         bundle = {"CPU": self.max_colocate_count}
         if self.use_gpu:
-            # In MIG environments, using a 'quasi-exclusive' value like 0.9 
-            # forces Ray to place each actor on a unique MIG instance 
-            # (since 0.9 + 0.9 > 1.0), effectively solving 'Duplicate GPU' 
-            # errors while avoiding the 'int()' conversion bugs often 
-            # triggered by num_gpus=1.
+            # In MIG environments, we set GPU: 0.001 in the PlacementGroup bundle 
+            # to ensure the node has GPU capability, but we'll manually manage 
+            # isolation in the Actor options to avoid Ray's buggy 
+            # device ID logic.
             gpu_resource_value = 1.0
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                gpu_resource_value = 0.9
-                # print(f"DEBUG: MIG detected in RayResourcePool, using quasi-exclusive value {gpu_resource_value}")
+                gpu_resource_value = 0.001
             
             bundle[device_name] = gpu_resource_value
             if self.accelerator_type is not None:
@@ -235,13 +233,30 @@ class RayClassWithInitArgs(ClassWithInitArgs):
         options.update(self._options)
 
         if use_gpu and device_name == "cuda":
-            # Consistent logic with RayResourcePool.get_placement_groups
-            # Use 0.9 for MIG actors to ensure isolation (0.9 + 0.9 > 1.0)
-            gpu_resource_value = 1.0
+            # Manual MIG isolation to bypass Ray's buggy resource manager
+            # We set num_gpus=0 so Ray doesn't try to manage the device IDs,
+            # but we manually set CUDA_VISIBLE_DEVICES for each actor.
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                gpu_resource_value = 0.9
-            options["num_gpus"] = gpu_resource_value
+                mig_uuids = cuda_visible_devices.split(",")
+                # Use the bundle index to pick a unique MIG UUID for this actor
+                if mig_uuids:
+                    # Map the bundle index to a MIG UUID (looping if necessary, though 
+                    # STRICT_PACK should ensure we have enough bundles)
+                    my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
+                    
+                    # Inject into runtime_env for this specific actor
+                    if "runtime_env" not in options:
+                        options["runtime_env"] = {}
+                    if "env_vars" not in options["runtime_env"]:
+                        options["runtime_env"]["env_vars"] = {}
+                    
+                    options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
+                    # print(f"DEBUG: Manually assigned MIG {my_mig_uuid} to actor at bundle {placement_group_bundle_idx}")
+                
+                options["num_gpus"] = 0
+            else:
+                options["num_gpus"] = 1
         if use_gpu and device_name == "npu":
             options["resources"] = {"NPU": num_gpus}
 
