@@ -112,7 +112,7 @@ class RayResourcePool(ResourcePool):
             device_name = "GPU"
 
         bundle = {"CPU": self.max_colocate_count}
-        if use_gpu:
+        if self.use_gpu:
             # In MIG environments, using a 'quasi-exclusive' value like 0.9 
             # forces Ray to place each actor on a unique MIG instance 
             # (since 0.9 + 0.9 > 1.0), effectively solving 'Duplicate GPU' 
