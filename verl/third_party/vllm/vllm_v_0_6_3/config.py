@@ -15,7 +15,9 @@
 
 import enum
 import json
+import os
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, List, Optional, Union
 
 from transformers import PretrainedConfig
@@ -31,6 +33,19 @@ if TYPE_CHECKING:
 logger = init_logger(__name__)
 
 
+@contextmanager
+def _mig_safe_cuda_visible_devices():
+    original_cvd = os.environ.get("CUDA_VISIBLE_DEVICES")
+    should_patch = isinstance(original_cvd, str) and original_cvd.startswith("MIG-") and "," not in original_cvd
+    if should_patch:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    try:
+        yield
+    finally:
+        if should_patch:
+            os.environ["CUDA_VISIBLE_DEVICES"] = original_cvd
+
+
 class LoadFormat(str, enum.Enum):
     AUTO = "auto"
     MEGATRON = "megatron"
@@ -43,7 +58,8 @@ class LoadFormat(str, enum.Enum):
 
 class ModelConfig(ModelConfig):
     def __init__(self, hf_config: PretrainedConfig, *args, **kwargs) -> None:
-        super().__init__(model=hf_config._name_or_path, tokenizer=hf_config._name_or_path, *args, **kwargs)  # noqa: B026
+        with _mig_safe_cuda_visible_devices():
+            super().__init__(model=hf_config._name_or_path, tokenizer=hf_config._name_or_path, *args, **kwargs)  # noqa: B026
         self.hf_config = hf_config
 
 
