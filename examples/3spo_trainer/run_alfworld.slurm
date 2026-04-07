@@ -48,6 +48,7 @@ export NCCL_DEBUG=INFO
 
 # 原生 MIG GRES 模式：严格要求 4 个 MIG，且必须来自 4 张不同物理 GPU。
 REQUIRED_MIGS=4
+BAD_MIG_EXIT_CODE=42
 
 # 调试：打印环境中的 GPU 变量
 echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
@@ -58,24 +59,18 @@ nvidia-smi -L
 ASSIGNED_MIGS="$CUDA_VISIBLE_DEVICES"
 if [ -z "$ASSIGNED_MIGS" ]; then
     echo "ERROR: CUDA_VISIBLE_DEVICES is empty under MIG GRES allocation."
-    echo "INFO: Requeueing job $SLURM_JOB_ID"
-    scontrol requeue "$SLURM_JOB_ID"
-    exit 0
+    exit "$BAD_MIG_EXIT_CODE"
 fi
 
 if ! echo "$ASSIGNED_MIGS" | grep -q 'MIG-'; then
     echo "ERROR: Expected MIG UUIDs in CUDA_VISIBLE_DEVICES, got: $ASSIGNED_MIGS"
-    echo "INFO: Requeueing job $SLURM_JOB_ID"
-    scontrol requeue "$SLURM_JOB_ID"
-    exit 0
+    exit "$BAD_MIG_EXIT_CODE"
 fi
 
 ASSIGNED_MIG_COUNT=$(echo "$ASSIGNED_MIGS" | awk -F',' '{print NF}')
 if [ "$ASSIGNED_MIG_COUNT" -lt "$REQUIRED_MIGS" ]; then
     echo "ERROR: Assigned only $ASSIGNED_MIG_COUNT MIG(s), require $REQUIRED_MIGS."
-    echo "INFO: Requeueing job $SLURM_JOB_ID"
-    scontrol requeue "$SLURM_JOB_ID"
-    exit 0
+    exit "$BAD_MIG_EXIT_CODE"
 fi
 
 ALL_GPU_LISTING=$(nvidia-smi -L)
@@ -98,9 +93,7 @@ while IFS= read -r mig_uuid; do
 
     if [ -z "$parent_gpu" ]; then
         echo "ERROR: Could not map MIG $mig_uuid to a physical GPU."
-        echo "INFO: Requeueing job $SLURM_JOB_ID"
-        scontrol requeue "$SLURM_JOB_ID"
-        exit 0
+        exit "$BAD_MIG_EXIT_CODE"
     fi
 
     if ! echo ",$DISTINCT_PARENT_GPUS," | grep -q ",$parent_gpu,"; then
@@ -119,9 +112,7 @@ if [ "$DISTINCT_PARENT_COUNT" -lt "$REQUIRED_MIGS" ]; then
     echo "ERROR: Assigned MIGs are not spread across $REQUIRED_MIGS physical GPUs."
     echo "ERROR: CUDA_VISIBLE_DEVICES=$ASSIGNED_MIGS"
     echo "ERROR: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
-    echo "INFO: Requeueing job $SLURM_JOB_ID"
-    scontrol requeue "$SLURM_JOB_ID"
-    exit 0
+    exit "$BAD_MIG_EXIT_CODE"
 fi
 
 REAL_MIG_UUIDS=$(echo "$SELECTED_MIGS" | awk -F',' -v required="$REQUIRED_MIGS" '
