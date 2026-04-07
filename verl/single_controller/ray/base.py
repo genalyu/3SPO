@@ -234,13 +234,14 @@ class RayClassWithInitArgs(ClassWithInitArgs):
         if use_gpu and device_name == "cuda":
             # Manual MIG isolation to bypass Ray's buggy resource manager.
             # We get the FULL list of MIG UUIDs from our special env var 
-            # 'VERL_ALL_MIG_IDS' (which TaskRunner passes down).
+            # 'VERL_ALL_MIG_IDS' (which we injected in ray.init).
             all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
             
             if "MIG-" in all_mig_ids:
                 mig_uuids = [id.strip() for id in all_mig_ids.split(",") if "MIG-" in id]
                 if mig_uuids:
-                    # Use placement_group_bundle_idx to partition the IDs
+                    # Deterministic partitioning using bundle index
+                    # This ensures each Rank gets a unique MIG ID from the full list
                     my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
                     
                     if "runtime_env" not in options:
@@ -250,13 +251,10 @@ class RayClassWithInitArgs(ClassWithInitArgs):
                     
                     options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
                     options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
+                    # print(f"DEBUG [base.py]: Partitioned MIG {my_mig_uuid} for bundle {placement_group_bundle_idx}", flush=True)
                 
-                # CRITICAL: In MIG environments, Ray's internal resource manager throws IndexError 
-                # if num_gpus > 0 because it tries to map to integer device indices.
-                # By setting num_gpus=0 here, we completely bypass Ray's buggy GPU logic,
-                # while our manual env var injection above handles the actual isolation.
-                # The PlacementGroup bundle still ensures we land on a GPU-capable node.
-                options["num_gpus"] = 0
+                # Use 0.99 to keep Ray Scheduler aware but avoid IndexError bugs
+                options["num_gpus"] = 0.99
             else:
                 options["num_gpus"] = 1
         if use_gpu and device_name == "npu":

@@ -51,24 +51,29 @@ def run_ppo(config) -> None:
         runtime_env_kwargs = ray_init_kwargs.get("runtime_env", {})
 
         runtime_env = OmegaConf.merge(default_runtime_env, runtime_env_kwargs)
+        
+        # In MIG environments, we pass the FULL list of MIG UUIDs as a special 
+        # environment variable 'VERL_ALL_MIG_IDS' to all Ray actors. 
+        # This is critical because Ray overrides CUDA_VISIBLE_DEVICES for 
+        # actors with num_gpus > 0, hiding other available MIG instances.
+        actual_all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
+        
+        if "env_vars" not in runtime_env:
+            runtime_env["env_vars"] = {}
+        
+        # Ensure these are strings and not OmegaConf objects
+        runtime_env["env_vars"]["VERL_ALL_MIG_IDS"] = str(actual_all_mig_ids)
+        if "MIG-" in str(actual_all_mig_ids):
+            print(f"Step: Injecting VERL_ALL_MIG_IDS={actual_all_mig_ids} into global ray.init runtime_env", flush=True)
+
         ray_init_kwargs = OmegaConf.create({**ray_init_kwargs, "runtime_env": runtime_env})
         print(f"ray init kwargs: {ray_init_kwargs}", flush=True)
         ray.init(**OmegaConf.to_container(ray_init_kwargs))
 
-    # In MIG environments, we pass the FULL list of MIG UUIDs as a special 
-    # environment variable 'VERL_ALL_MIG_IDS' to TaskRunner. 
-    # This allows the isolation logic in base.py to correctly partition 
-    # them among all training workers.
-    all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
-    
-    # Debug: verify environment variables before launching TaskRunner
-    print(f"Step: Launching TaskRunner with VERL_ALL_MIG_IDS={all_mig_ids}", flush=True)
-    
-    runner = TaskRunner.options(
-        num_cpus=1, 
-        num_gpus=0.01,
-        runtime_env={"env_vars": {"VERL_ALL_MIG_IDS": all_mig_ids}}
-    ).remote()
+    # TaskRunner is an orchestrator. We use a tiny fractional GPU (0.01) 
+    # to ensure it gets the GPU environment variables from Ray without 
+    # blocking a full GPU slot.
+    runner = TaskRunner.options(num_cpus=1, num_gpus=0.01).remote()
     ray.get(runner.run.remote(config))
 
 
