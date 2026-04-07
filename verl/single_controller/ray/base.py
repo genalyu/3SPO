@@ -113,14 +113,13 @@ class RayResourcePool(ResourcePool):
 
         bundle = {"CPU": self.max_colocate_count}
         if self.use_gpu:
-            # In MIG environments, we set GPU: 0.001 in the PlacementGroup bundle 
-            # to ensure the node has GPU capability, but we'll manually manage 
-            # isolation in the Actor options to avoid Ray's buggy 
-            # device ID logic.
+            # In MIG environments, we use 0.99 to ensure the scheduler sees this as 
+            # a quasi-exclusive resource (0.99 + 0.99 > 1.0), preventing two actors 
+            # from landing on the same MIG instance.
             gpu_resource_value = 1.0
-            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            cuda_visible_devices = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
             if "MIG-" in cuda_visible_devices:
-                gpu_resource_value = 0.001
+                gpu_resource_value = 0.99
             
             bundle[device_name] = gpu_resource_value
             if self.accelerator_type is not None:
@@ -235,35 +234,27 @@ class RayClassWithInitArgs(ClassWithInitArgs):
         if use_gpu and device_name == "cuda":
             # Manual MIG isolation to bypass Ray's buggy resource manager.
             # We get the FULL list of MIG UUIDs from our special env var 
-            # 'VERL_ALL_MIG_IDS' (which TaskRunner passes down) or fall back to 
-            # CUDA_VISIBLE_DEVICES if TaskRunner was given the full list.
+            # 'VERL_ALL_MIG_IDS' (which TaskRunner passes down).
             all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
             
-            # DEBUG: Print for investigation
-            # print(f"DEBUG [base.py]: VERL_ALL_MIG_IDS={os.environ.get('VERL_ALL_MIG_IDS')}, CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}", flush=True)
-
             if "MIG-" in all_mig_ids:
                 mig_uuids = [id.strip() for id in all_mig_ids.split(",") if "MIG-" in id]
-                # Use the bundle index to pick a unique MIG UUID for this actor
                 if mig_uuids:
                     # Use placement_group_bundle_idx to partition the IDs
                     my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
                     
-                    # Inject into runtime_env for this specific actor
                     if "runtime_env" not in options:
                         options["runtime_env"] = {}
                     if "env_vars" not in options["runtime_env"]:
                         options["runtime_env"]["env_vars"] = {}
                     
-                    # Critical: Set BOTH CUDA and NVIDIA visible devices
                     options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
                     options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
-                    # print(f"DEBUG: Manually assigned MIG {my_mig_uuid} to actor at bundle {placement_group_bundle_idx}", flush=True)
                 
-                # In MIG environments, setting num_gpus to 0 and manually managing
-                # visibility via env vars is the only reliable way to ensure 
-                # correct partitioning and avoid Ray internal IndexErrors.
-                options["num_gpus"] = 0
+                # In MIG environments, we still request 0.99 GPUs so the Ray Scheduler
+                # knows this slot is taken, but our manual env var injection above
+                # will override Ray's buggy attempt to set CUDA_VISIBLE_DEVICES.
+                options["num_gpus"] = 0.99
             else:
                 options["num_gpus"] = 1
         if use_gpu and device_name == "npu":
