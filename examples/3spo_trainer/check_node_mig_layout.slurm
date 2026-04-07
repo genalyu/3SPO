@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2
-#SBATCH --gres=gpu:16
+#SBATCH --gres=gpu:12
 #SBATCH --mem=8G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_check_mig_layout.out
