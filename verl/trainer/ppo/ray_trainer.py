@@ -115,7 +115,9 @@ class ResourcePoolManager:
             resource_pool = RayResourcePool(process_on_nodes=process_on_nodes, use_gpu=True, max_colocate_count=1, name_prefix=resource_pool_name)
             self.resource_pool_dict[resource_pool_name] = resource_pool
 
+        print("Step: Checking Ray cluster resources (this may hang if GCS is busy)...", flush=True)
         self._check_resource_available()
+        print("Step: Ray cluster resources verified.", flush=True)
 
     def get_resource_pool(self, role: Role) -> RayResourcePool:
         """Get the resource pool of the worker_cls"""
@@ -837,12 +839,15 @@ class RayPPOTrainer:
         1. Ray resource pools from configuration
         2. Worker groups for each role (actor, critic, etc.)
         """
+        print("Step: Creating resource pools...", flush=True)
         self.resource_pool_manager.create_resource_pool()
+        print("Step: Resource pools created.", flush=True)
 
         self.resource_pool_to_cls = {pool: {} for pool in self.resource_pool_manager.resource_pool_dict.values()}
 
         # create actor and rollout
         if self.hybrid_engine:
+            print("Step: Preparing actor and rollout class definitions...", flush=True)
             resource_pool = self.resource_pool_manager.get_resource_pool(Role.ActorRollout)
             actor_rollout_cls = RayClassWithInitArgs(
                 cls=self.role_worker_mapping[Role.ActorRollout],
@@ -855,18 +860,21 @@ class RayPPOTrainer:
 
         # create critic
         if self.use_critic:
+            print("Step: Preparing critic class definitions...", flush=True)
             resource_pool = self.resource_pool_manager.get_resource_pool(Role.Critic)
             critic_cls = RayClassWithInitArgs(cls=self.role_worker_mapping[Role.Critic], config=self.config.critic)
             self.resource_pool_to_cls[resource_pool]["critic"] = critic_cls
 
         # create reference policy if needed
         if self.use_reference_policy:
+            print("Step: Preparing reference policy class definitions...", flush=True)
             resource_pool = self.resource_pool_manager.get_resource_pool(Role.RefPolicy)
             ref_policy_cls = RayClassWithInitArgs(self.role_worker_mapping[Role.RefPolicy], config=self.config.actor_rollout_ref, role="ref")
             self.resource_pool_to_cls[resource_pool]["ref"] = ref_policy_cls
 
         # create a reward model if reward_fn is None
         if self.use_rm:
+            print("Step: Preparing reward model class definitions...", flush=True)
             # we create a RM here
             resource_pool = self.resource_pool_manager.get_resource_pool(Role.RewardModel)
             rm_cls = RayClassWithInitArgs(self.role_worker_mapping[Role.RewardModel], config=self.config.reward_model)
@@ -882,35 +890,37 @@ class RayPPOTrainer:
         if OmegaConf.select(self.config.trainer, "ray_wait_register_center_timeout") is not None:
             wg_kwargs["ray_wait_register_center_timeout"] = self.config.trainer.ray_wait_register_center_timeout
 
+        print("Step: Initializing WorkerGroups...", flush=True)
         for resource_pool, class_dict in self.resource_pool_to_cls.items():
             worker_dict_cls = create_colocated_worker_cls(class_dict=class_dict)
             wg_dict = self.ray_worker_group_cls(resource_pool=resource_pool, ray_cls_with_init=worker_dict_cls, device_name=self.device_name, **wg_kwargs)
             spawn_wg = wg_dict.spawn(prefix_set=class_dict.keys())
             all_wg.update(spawn_wg)
+        print("Step: WorkerGroups initialized.", flush=True)
 
         if self.use_critic:
-            print("Step: Initializing critic model...")
+            print("Step: Initializing critic model...", flush=True)
             self.critic_wg = all_wg["critic"]
             self.critic_wg.init_model()
-            print("Step: Critic model initialized.")
+            print("Step: Critic model initialized.", flush=True)
 
         if self.use_reference_policy and not self.ref_in_actor:
-            print("Step: Initializing reference policy model...")
+            print("Step: Initializing reference policy model...", flush=True)
             self.ref_policy_wg = all_wg["ref"]
             self.ref_policy_wg.init_model()
-            print("Step: Reference policy model initialized.")
+            print("Step: Reference policy model initialized.", flush=True)
 
         if self.use_rm:
-            print("Step: Initializing reward model...")
+            print("Step: Initializing reward model...", flush=True)
             self.rm_wg = all_wg["rm"]
             self.rm_wg.init_model()
-            print("Step: Reward model initialized.")
+            print("Step: Reward model initialized.", flush=True)
 
         # we should create rollout at the end so that vllm can have a better estimation of kv cache memory
-        print("Step: Initializing actor and rollout model...")
+        print("Step: Initializing actor and rollout model...", flush=True)
         self.actor_rollout_wg = all_wg["actor_rollout"]
         self.actor_rollout_wg.init_model()
-        print("Step: Actor and rollout model initialized.")
+        print("Step: Actor and rollout model initialized.", flush=True)
 
         # create async rollout manager and request scheduler
         self.async_rollout_mode = False

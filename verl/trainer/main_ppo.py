@@ -40,11 +40,19 @@ def run_ppo(config) -> None:
         # `num_cpus` specifies the number of CPU cores Ray can use, obtained from the configuration
         default_runtime_env = get_ppo_ray_runtime_env()
         ray_init_kwargs = config.get("ray_init", {})
+        
+        # Handle SLURM CPU detection
+        if ray_init_kwargs.get("num_cpus") is None:
+            slurm_cpus = os.environ.get("SLURM_CPUS_PER_TASK")
+            if slurm_cpus:
+                ray_init_kwargs["num_cpus"] = int(slurm_cpus)
+                print(f"Step: Auto-detected SLURM_CPUS_PER_TASK={slurm_cpus}, setting ray_init.num_cpus accordingly.", flush=True)
+
         runtime_env_kwargs = ray_init_kwargs.get("runtime_env", {})
 
         runtime_env = OmegaConf.merge(default_runtime_env, runtime_env_kwargs)
         ray_init_kwargs = OmegaConf.create({**ray_init_kwargs, "runtime_env": runtime_env})
-        print(f"ray init kwargs: {ray_init_kwargs}")
+        print(f"ray init kwargs: {ray_init_kwargs}", flush=True)
         ray.init(**OmegaConf.to_container(ray_init_kwargs))
 
     # TaskRunner needs to see GPU environment variables to correctly 
@@ -67,23 +75,23 @@ class TaskRunner:
         OmegaConf.resolve(config)
 
         # download the checkpoint from hdfs
-        print(f"Step: Copying model from {config.actor_rollout_ref.model.path} to local...")
+        print(f"Step: Copying model from {config.actor_rollout_ref.model.path} to local...", flush=True)
         local_path = copy_to_local(config.actor_rollout_ref.model.path, use_shm=config.actor_rollout_ref.model.get("use_shm", False))
-        print(f"Step: Model copied to {local_path}")
+        print(f"Step: Model copied to {local_path}", flush=True)
 
         from agent_system.environments import make_envs
-        print("Step: Initializing environments...")
+        print("Step: Initializing environments...", flush=True)
         envs, val_envs = make_envs(config)
-        print("Step: Environments initialized.")
+        print("Step: Environments initialized.", flush=True)
 
         # instantiate tokenizer
         from verl.utils import hf_processor, hf_tokenizer
 
         trust_remote_code = config.data.get("trust_remote_code", False)
-        print("Step: Initializing tokenizer and processor...")
+        print("Step: Initializing tokenizer and processor...", flush=True)
         tokenizer = hf_tokenizer(local_path, trust_remote_code=trust_remote_code)
         processor = hf_processor(local_path, trust_remote_code=trust_remote_code, use_fast=True)  # used for multimodal LLM, could be none
-        print("Step: Tokenizer and processor initialized.")
+        print("Step: Tokenizer and processor initialized.", flush=True)
 
         # vllm early verify
         if config.actor_rollout_ref.rollout.name in ["vllm"]:
@@ -94,7 +102,7 @@ class TaskRunner:
                     raise NotImplementedError("PPO LoRA is not supported before vllm 0.7.3")
 
         # define worker classes
-        print("Step: Defining worker classes...")
+        print("Step: Defining worker classes...", flush=True)
         if config.actor_rollout_ref.actor.strategy in ["fsdp", "fsdp2"]:
             assert config.critic.strategy in ["fsdp", "fsdp2"]
             from verl.single_controller.ray import RayWorkerGroup
