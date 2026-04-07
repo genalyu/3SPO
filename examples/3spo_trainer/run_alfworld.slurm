@@ -62,7 +62,7 @@ fi
 ray stop --force
 
 ENGINE=${1:-vllm}
-num_cpus_per_env_worker=1.0
+num_cpus_per_env_worker=0.1
 
 train_data_size=16
 val_data_size=128
