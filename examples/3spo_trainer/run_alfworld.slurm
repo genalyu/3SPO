@@ -14,7 +14,7 @@ set -x
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate verl-agent-alf
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
-export VLLM_ATTENTION_BACKEND=XFORMERS
+export VLLM_ATTENTION_BACKEND=FLASH_ATTN
 export PYTHONUNBUFFERED=1
 export WANDB_MODE=offline  # Enable offline WandB
 export HF_ENDPOINT=https://hf-mirror.com
