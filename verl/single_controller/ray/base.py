@@ -253,8 +253,11 @@ class RayClassWithInitArgs(ClassWithInitArgs):
                     options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
                     # print(f"DEBUG [base.py]: Partitioned MIG {my_mig_uuid} for bundle {placement_group_bundle_idx}", flush=True)
                 
-                # Use 0.99 to keep Ray Scheduler aware but avoid IndexError bugs
-                options["num_gpus"] = 0.99
+                # In MIG mode, let the placement group reserve the GPU-shaped bundle
+                # and rely on manually injected CUDA_VISIBLE_DEVICES for isolation.
+                # Requesting num_gpus here makes Ray run its internal accelerator-id
+                # mapping, which is fragile for MIG UUIDs and can crash actor startup.
+                options["num_gpus"] = 0
             else:
                 options["num_gpus"] = 1
         if use_gpu and device_name == "npu":
