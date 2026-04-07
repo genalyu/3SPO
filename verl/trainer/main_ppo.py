@@ -55,10 +55,16 @@ def run_ppo(config) -> None:
         print(f"ray init kwargs: {ray_init_kwargs}", flush=True)
         ray.init(**OmegaConf.to_container(ray_init_kwargs))
 
-    # TaskRunner is an orchestrator and doesn't need a dedicated GPU.
-    # We set num_gpus=0 to avoid consuming a GPU slot that training workers need,
-    # but it will still inherit CUDA_VISIBLE_DEVICES from the ray.init runtime_env.
-    runner = TaskRunner.options(num_gpus=0.01).remote()
+    # In MIG environments, we pass the FULL list of MIG UUIDs as a special 
+    # environment variable 'VERL_ALL_MIG_IDS' to TaskRunner. 
+    # This allows the isolation logic in base.py to correctly partition 
+    # them among all training workers.
+    all_mig_ids = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+    runner = TaskRunner.options(
+        num_cpus=1, 
+        num_gpus=0.01,
+        runtime_env={"env_vars": {"VERL_ALL_MIG_IDS": all_mig_ids}}
+    ).remote()
     ray.get(runner.run.remote(config))
 
 

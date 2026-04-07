@@ -55,6 +55,8 @@ REAL_MIG_UUIDS=$(nvidia-smi -L | grep -o 'MIG-[^)]*' | paste -sd "," -)
 if [ ! -z "$REAL_MIG_UUIDS" ]; then
     echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
     export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+    # 额外设置这个变量，确保我们的 TaskRunner 能拿到完整的列表
+    export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
     echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 else
     echo "DEBUG: No MIG UUIDs detected by nvidia-smi -L"

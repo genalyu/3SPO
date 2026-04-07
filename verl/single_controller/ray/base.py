@@ -233,16 +233,17 @@ class RayClassWithInitArgs(ClassWithInitArgs):
         options.update(self._options)
 
         if use_gpu and device_name == "cuda":
-            # Manual MIG isolation to bypass Ray's buggy resource manager
-            # We set num_gpus=0 so Ray doesn't try to manage the device IDs,
-            # but we manually set CUDA_VISIBLE_DEVICES for each actor.
-            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-            if "MIG-" in cuda_visible_devices:
-                mig_uuids = cuda_visible_devices.split(",")
+            # Manual MIG isolation to bypass Ray's buggy resource manager.
+            # We get the FULL list of MIG UUIDs from our special env var 
+            # 'VERL_ALL_MIG_IDS' (which TaskRunner passes down) or fall back to 
+            # CUDA_VISIBLE_DEVICES if TaskRunner was given the full list.
+            all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
+            
+            if "MIG-" in all_mig_ids:
+                mig_uuids = [id.strip() for id in all_mig_ids.split(",") if "MIG-" in id]
                 # Use the bundle index to pick a unique MIG UUID for this actor
                 if mig_uuids:
-                    # Map the bundle index to a MIG UUID (looping if necessary, though 
-                    # STRICT_PACK should ensure we have enough bundles)
+                    # Use placement_group_bundle_idx to partition the IDs
                     my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
                     
                     # Inject into runtime_env for this specific actor
@@ -251,7 +252,9 @@ class RayClassWithInitArgs(ClassWithInitArgs):
                     if "env_vars" not in options["runtime_env"]:
                         options["runtime_env"]["env_vars"] = {}
                     
+                    # Critical: Set BOTH CUDA and NVIDIA visible devices
                     options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
+                    options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
                     # print(f"DEBUG: Manually assigned MIG {my_mig_uuid} to actor at bundle {placement_group_bundle_idx}")
                 
                 options["num_gpus"] = 0
