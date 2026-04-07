@@ -40,14 +40,4 @@ def _patch_vllm_mig_device_ids():
         pass
 
 
-def _patch_single_mig_visibility():
-    original_cvd = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-    if isinstance(original_cvd, str) and original_cvd.startswith("MIG-") and "," not in original_cvd:
-        # Some vLLM init-time checks incorrectly int() CUDA_VISIBLE_DEVICES.
-        # Single-MIG workers should treat the visible device as local index 0.
-        os.environ["ORIG_CUDA_VISIBLE_DEVICES"] = original_cvd
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-
-_patch_single_mig_visibility()
 _patch_vllm_mig_device_ids()
