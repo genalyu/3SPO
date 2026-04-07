@@ -28,6 +28,8 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 # 因为 MIG 实例之间在物理上无法直接 P2P 访问
 export NCCL_P2P_DISABLE=1
 export NCCL_SHM_DISABLE=1
+# 增加这个变量，告诉 NCCL 忽略由于 P2P 被禁用引发的额外拓扑检查
+export NCCL_IGNORE_DISABLED_P2P=1
 # 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
 export VLLM_SKIP_P2P_CHECK=1
 # 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
