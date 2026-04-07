@@ -238,7 +238,11 @@ class RayClassWithInitArgs(ClassWithInitArgs):
             # we can safely use num_gpus=1 even in MIG environments.
             # This ensures Ray performs proper resource isolation and avoids
             # NCCL 'Duplicate GPU' errors (rank 0 and rank 1 on same device).
-            options["num_gpus"] = 1
+            gpu_resource_value = 1.0
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                gpu_resource_value = 0.001
+            options["num_gpus"] = gpu_resource_value
         if use_gpu and device_name == "npu":
             options["resources"] = {"NPU": num_gpus}
 
