@@ -251,10 +251,12 @@ class RayClassWithInitArgs(ClassWithInitArgs):
                     options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
                     options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
                 
-                # In MIG environments, we still request 0.99 GPUs so the Ray Scheduler
-                # knows this slot is taken, but our manual env var injection above
-                # will override Ray's buggy attempt to set CUDA_VISIBLE_DEVICES.
-                options["num_gpus"] = 0.99
+                # CRITICAL: In MIG environments, Ray's internal resource manager throws IndexError 
+                # if num_gpus > 0 because it tries to map to integer device indices.
+                # By setting num_gpus=0 here, we completely bypass Ray's buggy GPU logic,
+                # while our manual env var injection above handles the actual isolation.
+                # The PlacementGroup bundle still ensures we land on a GPU-capable node.
+                options["num_gpus"] = 0
             else:
                 options["num_gpus"] = 1
         if use_gpu and device_name == "npu":
