@@ -29,7 +29,10 @@ def patch_vllm_device_id_to_physical_device_id():
                 return int(device_id)
             except (ValueError, TypeError):
                 # In MIG environment, device_id can be a string like 'MIG-xxx'
-                # vLLM expects an int here, but we return the string as is.
+                # Each worker is already restricted to a single visible MIG, so
+                # downstream code should treat it as local cuda:0.
+                if isinstance(device_id, str) and device_id.startswith("MIG-"):
+                    return 0
                 return device_id
 
         if hasattr(vllm_interface, 'device_id_to_physical_device_id'):
@@ -42,6 +45,19 @@ def patch_vllm_device_id_to_physical_device_id():
                 CudaPlatform.device_id_to_physical_device_id = staticmethod(patched_fn)
         except (ImportError, AttributeError):
             pass
+
+        # Newer vLLM releases route some checks through platform registry/current_platform.
+        for module_name, attr_name in [
+            ("vllm.platforms", "current_platform"),
+            ("vllm.platforms.cuda", "CudaPlatform"),
+        ]:
+            try:
+                module = importlib.import_module(module_name)
+                platform_obj = getattr(module, attr_name, None)
+                if platform_obj is not None and hasattr(platform_obj, "device_id_to_physical_device_id"):
+                    setattr(platform_obj, "device_id_to_physical_device_id", staticmethod(patched_fn))
+            except (ImportError, AttributeError):
+                pass
 
     except (ImportError, AttributeError):
         pass

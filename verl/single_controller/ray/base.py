@@ -421,6 +421,10 @@ class RayWorkerGroup(WorkerGroup):
                         env_vars["CUDA_VISIBLE_DEVICES"] = cvd_list[local_rank]
                         # Some frameworks use these as fallback
                         env_vars["NVIDIA_VISIBLE_DEVICES"] = cvd_list[local_rank]
+                        # Once visibility is restricted to a single MIG UUID,
+                        # the process should treat it as cuda:0.
+                        env_vars["LOCAL_RANK"] = "0"
+                        env_vars["RAY_LOCAL_RANK"] = "0"
                         # For vLLM/PyTorch, sometimes using MIG UUID is not enough 
                         # if the index-based mapping is expected.
                         # But with num_gpus=0.001, we want PyTorch to see this as 'cuda:0'
