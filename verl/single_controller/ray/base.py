@@ -113,16 +113,37 @@ class RayResourcePool(ResourcePool):
 
         bundle = {"CPU": self.max_colocate_count}
         if self.use_gpu:
-            bundle[device_name] = 1
+            # In MIG environments, asking for a full 'GPU: 1' resource in a PlacementGroup
+            # can sometimes fail or hang if Ray doesn't correctly map MIG instances to integer GPUs.
+            # Using a small fractional value (0.001) allows more flexible scheduling 
+            # while still ensuring the bundle is assigned to a node with GPU capability.
+            gpu_resource_value = 1.0
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                gpu_resource_value = 0.001
+                # print(f"DEBUG: MIG detected in RayResourcePool, using GPU resource value {gpu_resource_value}")
+            
+            bundle[device_name] = gpu_resource_value
             if self.accelerator_type is not None:
                 bundle[self.accelerator_type] = 1e-4
         pg_scheme = [[bundle.copy() for _ in range(process_count)] for process_count in self._store]
 
         lifetime = "detached" if self.detached else None
 
+        print(f"Step: Creating {len(pg_scheme)} placement groups with bundle {bundle}...", flush=True)
         pgs = [placement_group(bundles=bundles, strategy=strategy, name=pg_name_prefix + str(idx), lifetime=lifetime) for idx, bundles in enumerate(pg_scheme)]
 
-        ray.get([pg.ready() for pg in pgs])
+        print(f"Step: Waiting for {len(pgs)} placement groups to be ready...", flush=True)
+        try:
+            # Wait for placement groups with a timeout to avoid infinite hang
+            ready_refs = [pg.ready() for pg in pgs]
+            finished, pending = ray.wait(ready_refs, timeout=60.0)
+            if pending:
+                print(f"Warning: {len(pending)} placement groups are still not ready after 60s. This might be due to resource constraints or Ray GCS congestion. Ray will continue trying to schedule them in the background.", flush=True)
+            else:
+                print("Step: All placement groups are ready.", flush=True)
+        except Exception as e:
+            print(f"Warning: Exception while waiting for placement groups: {e}. Proceeding anyway...", flush=True)
 
         self.pgs = pgs
         return pgs
