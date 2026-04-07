@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1g.35gb:4
 #SBATCH --mem=512G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_alfworld.out
@@ -46,45 +46,101 @@ export CUDA_LAUNCH_BLOCKING=1
 export TORCH_DISTRIBUTED_DEBUG=INFO
 export NCCL_DEBUG=INFO 
 
+# 原生 MIG GRES 模式：严格要求 4 个 MIG，且必须来自 4 张不同物理 GPU。
+REQUIRED_MIGS=4
+
 # 调试：打印环境中的 GPU 变量
 echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
 echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi -L
 
-# 在某些集群上，SLURM 给的是索引 (0,1,2,3) 但在 MIG 开启时 PyTorch 需要真实的 MIG UUID。
-# 这里按“每张物理 GPU 最多选一个 MIG”来构造可见设备，避免同卡多个 MIG
-# 被 NCCL/FSDP 识别为 Duplicate GPU。
-REAL_MIG_UUIDS=$(nvidia-smi -L | awk '
-    /^GPU [0-9]+:/ {
-        current_gpu=$2
-        sub(":", "", current_gpu)
-        next
-    }
-    /MIG-[^)]+/ {
-        if (!(current_gpu in seen_gpu)) {
-            match($0, /MIG-[^)]+/)
-            if (RSTART > 0) {
-                mig=substr($0, RSTART, RLENGTH)
-                migs[++count]=mig
-                seen_gpu[current_gpu]=1
-            }
+# Slurm 在 MIG GRES 模式下应该直接把分配给作业的 MIG 暴露到 CUDA_VISIBLE_DEVICES。
+ASSIGNED_MIGS="$CUDA_VISIBLE_DEVICES"
+if [ -z "$ASSIGNED_MIGS" ]; then
+    echo "ERROR: CUDA_VISIBLE_DEVICES is empty under MIG GRES allocation."
+    echo "INFO: Requeueing job $SLURM_JOB_ID"
+    scontrol requeue "$SLURM_JOB_ID"
+    exit 0
+fi
+
+if ! echo "$ASSIGNED_MIGS" | grep -q 'MIG-'; then
+    echo "ERROR: Expected MIG UUIDs in CUDA_VISIBLE_DEVICES, got: $ASSIGNED_MIGS"
+    echo "INFO: Requeueing job $SLURM_JOB_ID"
+    scontrol requeue "$SLURM_JOB_ID"
+    exit 0
+fi
+
+ASSIGNED_MIG_COUNT=$(echo "$ASSIGNED_MIGS" | awk -F',' '{print NF}')
+if [ "$ASSIGNED_MIG_COUNT" -lt "$REQUIRED_MIGS" ]; then
+    echo "ERROR: Assigned only $ASSIGNED_MIG_COUNT MIG(s), require $REQUIRED_MIGS."
+    echo "INFO: Requeueing job $SLURM_JOB_ID"
+    scontrol requeue "$SLURM_JOB_ID"
+    exit 0
+fi
+
+ALL_GPU_LISTING=$(nvidia-smi -L)
+DISTINCT_PARENT_GPUS=""
+SELECTED_MIGS=""
+while IFS= read -r mig_uuid; do
+    mig_uuid=$(echo "$mig_uuid" | xargs)
+    [ -z "$mig_uuid" ] && continue
+
+    parent_gpu=$(echo "$ALL_GPU_LISTING" | awk -v target="$mig_uuid" '
+        /^GPU [0-9]+:/ {
+            current_gpu=$2
+            sub(":", "", current_gpu)
         }
-    }
-    END {
-        for (i=1; i<=count; ++i) {
-            printf "%s%s", migs[i], (i < count ? "," : "")
+        index($0, target) {
+            print current_gpu
+            exit
+        }
+    ')
+
+    if [ -z "$parent_gpu" ]; then
+        echo "ERROR: Could not map MIG $mig_uuid to a physical GPU."
+        echo "INFO: Requeueing job $SLURM_JOB_ID"
+        scontrol requeue "$SLURM_JOB_ID"
+        exit 0
+    fi
+
+    if ! echo ",$DISTINCT_PARENT_GPUS," | grep -q ",$parent_gpu,"; then
+        if [ -n "$DISTINCT_PARENT_GPUS" ]; then
+            DISTINCT_PARENT_GPUS="${DISTINCT_PARENT_GPUS},${parent_gpu}"
+            SELECTED_MIGS="${SELECTED_MIGS},${mig_uuid}"
+        else
+            DISTINCT_PARENT_GPUS="$parent_gpu"
+            SELECTED_MIGS="$mig_uuid"
+        fi
+    fi
+done <<< "$(echo "$ASSIGNED_MIGS" | tr ',' '\n')"
+
+DISTINCT_PARENT_COUNT=$(echo "$DISTINCT_PARENT_GPUS" | awk -F',' '{print NF}')
+if [ "$DISTINCT_PARENT_COUNT" -lt "$REQUIRED_MIGS" ]; then
+    echo "ERROR: Assigned MIGs are not spread across $REQUIRED_MIGS physical GPUs."
+    echo "ERROR: CUDA_VISIBLE_DEVICES=$ASSIGNED_MIGS"
+    echo "ERROR: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
+    echo "INFO: Requeueing job $SLURM_JOB_ID"
+    scontrol requeue "$SLURM_JOB_ID"
+    exit 0
+fi
+
+REAL_MIG_UUIDS=$(echo "$SELECTED_MIGS" | awk -F',' -v required="$REQUIRED_MIGS" '
+    {
+        for (i = 1; i <= NF && i <= required; ++i) {
+            printf "%s%s", $i, (i < required ? "," : "")
         }
     }
 ')
-if [ ! -z "$REAL_MIG_UUIDS" ]; then
-    echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
-    export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
-    # 额外设置这个变量，确保我们的 TaskRunner 能拿到完整的列表
-    export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
-    echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
-else
-    echo "DEBUG: No MIG UUIDs detected by nvidia-smi -L"
-fi
+export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
+echo "DEBUG: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
+echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
+echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+
+TRAIN_GPUS_PER_NODE=$REQUIRED_MIGS
+ROLLOUT_TP_SIZE=2
+echo "DEBUG: TRAIN_GPUS_PER_NODE=$TRAIN_GPUS_PER_NODE"
+echo "DEBUG: ROLLOUT_TP_SIZE=$ROLLOUT_TP_SIZE"
 # --- MIG 环境关键修复结束 ---
 # 确保旧的 Ray 进程不会带着旧变量残留
 ray stop --force
@@ -140,7 +196,7 @@ python3 -m gigpo.main_3spo \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=32 \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=$ROLLOUT_TP_SIZE \
     actor_rollout_ref.rollout.name=$ENGINE \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.enable_chunked_prefill=False \
@@ -163,7 +219,7 @@ python3 -m gigpo.main_3spo \
     trainer.logger=['console','wandb'] \
     trainer.project_name='verl_agent_alfworld' \
     trainer.experiment_name='3spo_qwen2.5_1.5b_slurm' \
-    trainer.n_gpus_per_node=4 \
+    trainer.n_gpus_per_node=$TRAIN_GPUS_PER_NODE \
     trainer.nnodes=1 \
     trainer.default_local_dir=$HOME/project/verl-agent/checkpoints/alfworld/$SLURM_JOB_ID \
     trainer.save_freq=100 \
