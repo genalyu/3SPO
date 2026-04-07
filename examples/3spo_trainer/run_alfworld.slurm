@@ -36,6 +36,8 @@ export VLLM_SKIP_P2P_CHECK=1
 export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
 # 强制导出环境变量给 Ray Actor (关键！)
 export RAY_EXPORT_CUDA_VISIBLE_DEVICES=1
+# 禁止 Ray 在 actor 启动时自动清空/重写 CUDA_VISIBLE_DEVICES
+export RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES=1
 # 某些集群需要强制禁用 IB 通信来配合 MIG，如果报错继续，请取消下面这行的注释
 export NCCL_IB_DISABLE=1 
 

@@ -54,7 +54,12 @@ def get_ppo_ray_runtime_env():
 
     # Force export of CUDA_VISIBLE_DEVICES and MIG related variables for Ray tasks
     # This is critical for MIG environments where we manually manage isolation.
-    for key in ["CUDA_VISIBLE_DEVICES", "RAY_EXPORT_CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"]:
+    for key in [
+        "CUDA_VISIBLE_DEVICES",
+        "RAY_EXPORT_CUDA_VISIBLE_DEVICES",
+        "RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES",
+        "CUDA_DEVICE_ORDER",
+    ]:
         if os.environ.get(key) is not None:
             runtime_env["env_vars"][key] = os.environ.get(key)
 

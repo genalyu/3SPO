@@ -404,6 +404,7 @@ class RayWorkerGroup(WorkerGroup):
                     # For Ray 2.10+, setting this to 0 prevents Ray from unsetting 
                     # CUDA_VISIBLE_DEVICES when num_gpus=0 is requested.
                     "RAY_EXPORT_CUDA_VISIBLE_DEVICES": "1", # Changed to 1 to force export
+                    "RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES": "1",
                     "VERL_ALL_MIG_IDS": all_visible_devices,
                     # Explicitly unset AMD and NPU specific variables to avoid conflicts
                     "HIP_VISIBLE_DEVICES": "",
