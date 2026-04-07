@@ -58,27 +58,31 @@ echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
 echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi -L
 
-# Slurm 在 MIG GRES 模式下应该直接把分配给作业的 MIG 暴露到 CUDA_VISIBLE_DEVICES。
-ASSIGNED_MIGS="$CUDA_VISIBLE_DEVICES"
-if [ -z "$ASSIGNED_MIGS" ]; then
+ALL_GPU_LISTING=$(nvidia-smi -L)
+DISTINCT_PARENT_GPUS=""
+SELECTED_MIGS=""
+
+# 有些集群在 MIG GRES 模式下会把 CUDA_VISIBLE_DEVICES 设为索引而不是 MIG UUID。
+# 这里统一从当前可见的 nvidia-smi -L 中挑选 MIG，并优先在不同物理 GPU 间分散。
+if [ -z "${CUDA_VISIBLE_DEVICES:-}" ]; then
     echo "ERROR: CUDA_VISIBLE_DEVICES is empty under MIG GRES allocation."
     exit "$BAD_MIG_EXIT_CODE"
 fi
 
-if ! echo "$ASSIGNED_MIGS" | grep -q 'MIG-'; then
-    echo "ERROR: Expected MIG UUIDs in CUDA_VISIBLE_DEVICES, got: $ASSIGNED_MIGS"
-    exit "$BAD_MIG_EXIT_CODE"
+if echo "$CUDA_VISIBLE_DEVICES" | grep -q 'MIG-'; then
+    CANDIDATE_MIGS=$(echo "$CUDA_VISIBLE_DEVICES" | tr ',' '\n')
+else
+    echo "DEBUG: CUDA_VISIBLE_DEVICES contains indices, deriving MIG candidates from nvidia-smi -L"
+    CANDIDATE_MIGS=$(echo "$ALL_GPU_LISTING" | grep -o 'MIG-[^)]*' || true)
 fi
 
-ASSIGNED_MIG_COUNT=$(echo "$ASSIGNED_MIGS" | awk -F',' '{print NF}')
+ASSIGNED_MIG_COUNT=$(echo "$CANDIDATE_MIGS" | sed '/^\s*$/d' | wc -l | tr -d ' ')
 if [ "$ASSIGNED_MIG_COUNT" -lt "$REQUESTED_MIGS" ]; then
-    echo "ERROR: Assigned only $ASSIGNED_MIG_COUNT MIG(s), require $REQUESTED_MIGS."
+    echo "ERROR: Visible MIG candidates only $ASSIGNED_MIG_COUNT, require at least $REQUESTED_MIGS."
+    echo "ERROR: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
     exit "$BAD_MIG_EXIT_CODE"
 fi
 
-ALL_GPU_LISTING=$(nvidia-smi -L)
-DISTINCT_PARENT_GPUS=""
-SELECTED_MIGS=""
 while IFS= read -r mig_uuid; do
     mig_uuid=$(echo "$mig_uuid" | xargs)
     [ -z "$mig_uuid" ] && continue
@@ -108,12 +112,12 @@ while IFS= read -r mig_uuid; do
             SELECTED_MIGS="$mig_uuid"
         fi
     fi
-done <<< "$(echo "$ASSIGNED_MIGS" | tr ',' '\n')"
+done <<< "$CANDIDATE_MIGS"
 
 DISTINCT_PARENT_COUNT=$(echo "$DISTINCT_PARENT_GPUS" | awk -F',' '{print NF}')
 if [ "$DISTINCT_PARENT_COUNT" -lt "$REQUIRED_DISTINCT_GPUS" ]; then
     echo "ERROR: Assigned MIGs are not spread across $REQUIRED_DISTINCT_GPUS physical GPUs."
-    echo "ERROR: CUDA_VISIBLE_DEVICES=$ASSIGNED_MIGS"
+    echo "ERROR: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
     echo "ERROR: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
     exit "$BAD_MIG_EXIT_CODE"
 fi
