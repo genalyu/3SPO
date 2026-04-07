@@ -112,16 +112,17 @@ class RayResourcePool(ResourcePool):
             device_name = "GPU"
 
         bundle = {"CPU": self.max_colocate_count}
-        if self.use_gpu:
-            # In MIG environments, asking for a full 'GPU: 1' resource in a PlacementGroup
-            # can sometimes fail or hang if Ray doesn't correctly map MIG instances to integer GPUs.
-            # Using a small fractional value (0.001) allows more flexible scheduling 
-            # while still ensuring the bundle is assigned to a node with GPU capability.
+        if use_gpu:
+            # In MIG environments, using a 'quasi-exclusive' value like 0.9 
+            # forces Ray to place each actor on a unique MIG instance 
+            # (since 0.9 + 0.9 > 1.0), effectively solving 'Duplicate GPU' 
+            # errors while avoiding the 'int()' conversion bugs often 
+            # triggered by num_gpus=1.
             gpu_resource_value = 1.0
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                gpu_resource_value = 0.001
-                # print(f"DEBUG: MIG detected in RayResourcePool, using GPU resource value {gpu_resource_value}")
+                gpu_resource_value = 0.9
+                # print(f"DEBUG: MIG detected in RayResourcePool, using quasi-exclusive value {gpu_resource_value}")
             
             bundle[device_name] = gpu_resource_value
             if self.accelerator_type is not None:
@@ -234,14 +235,12 @@ class RayClassWithInitArgs(ClassWithInitArgs):
         options.update(self._options)
 
         if use_gpu and device_name == "cuda":
-            # Since we have patched vLLM/Ray's device ID parsing in verl/__init__.py,
-            # we can safely use num_gpus=1 even in MIG environments.
-            # This ensures Ray performs proper resource isolation and avoids
-            # NCCL 'Duplicate GPU' errors (rank 0 and rank 1 on same device).
+            # Consistent logic with RayResourcePool.get_placement_groups
+            # Use 0.9 for MIG actors to ensure isolation (0.9 + 0.9 > 1.0)
             gpu_resource_value = 1.0
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                gpu_resource_value = 0.001
+                gpu_resource_value = 0.9
             options["num_gpus"] = gpu_resource_value
         if use_gpu and device_name == "npu":
             options["resources"] = {"NPU": num_gpus}
