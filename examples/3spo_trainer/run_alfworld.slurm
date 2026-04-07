@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --gres=gpu:1g.35gb:4
+#SBATCH --gres=gpu:1g.35gb:5
 #SBATCH --mem=512G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_alfworld.out
@@ -47,8 +47,8 @@ export TORCH_DISTRIBUTED_DEBUG=INFO
 export NCCL_DEBUG=INFO 
 
 # 原生 MIG GRES 模式：
-# 调度层申请 4 个 MIG，但训练时只使用来自 2 张不同物理 GPU 的 2 个 MIG。
-REQUESTED_MIGS=4
+# 调度层申请 5 个 MIG，但训练时只使用来自 2 张不同物理 GPU 的 2 个 MIG。
+REQUESTED_MIGS=5
 REQUIRED_DISTINCT_GPUS=2
 TRAIN_GPUS_PER_NODE=2
 BAD_MIG_EXIT_CODE=42
