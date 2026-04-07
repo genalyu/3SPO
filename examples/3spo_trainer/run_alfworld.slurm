@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --gres=gpu:1g.35gb:2
+#SBATCH --gres=gpu:1g.35gb:4
 #SBATCH --mem=512G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_alfworld.out
@@ -46,8 +46,11 @@ export CUDA_LAUNCH_BLOCKING=1
 export TORCH_DISTRIBUTED_DEBUG=INFO
 export NCCL_DEBUG=INFO 
 
-# 原生 MIG GRES 模式：严格要求 4 个 MIG，且必须来自 4 张不同物理 GPU。
-REQUIRED_MIGS=4
+# 原生 MIG GRES 模式：
+# 调度层申请 4 个 MIG，但训练时只使用来自 2 张不同物理 GPU 的 2 个 MIG。
+REQUESTED_MIGS=4
+REQUIRED_DISTINCT_GPUS=2
+TRAIN_GPUS_PER_NODE=2
 BAD_MIG_EXIT_CODE=42
 
 # 调试：打印环境中的 GPU 变量
@@ -68,8 +71,8 @@ if ! echo "$ASSIGNED_MIGS" | grep -q 'MIG-'; then
 fi
 
 ASSIGNED_MIG_COUNT=$(echo "$ASSIGNED_MIGS" | awk -F',' '{print NF}')
-if [ "$ASSIGNED_MIG_COUNT" -lt "$REQUIRED_MIGS" ]; then
-    echo "ERROR: Assigned only $ASSIGNED_MIG_COUNT MIG(s), require $REQUIRED_MIGS."
+if [ "$ASSIGNED_MIG_COUNT" -lt "$REQUESTED_MIGS" ]; then
+    echo "ERROR: Assigned only $ASSIGNED_MIG_COUNT MIG(s), require $REQUESTED_MIGS."
     exit "$BAD_MIG_EXIT_CODE"
 fi
 
@@ -108,14 +111,14 @@ while IFS= read -r mig_uuid; do
 done <<< "$(echo "$ASSIGNED_MIGS" | tr ',' '\n')"
 
 DISTINCT_PARENT_COUNT=$(echo "$DISTINCT_PARENT_GPUS" | awk -F',' '{print NF}')
-if [ "$DISTINCT_PARENT_COUNT" -lt "$REQUIRED_MIGS" ]; then
-    echo "ERROR: Assigned MIGs are not spread across $REQUIRED_MIGS physical GPUs."
+if [ "$DISTINCT_PARENT_COUNT" -lt "$REQUIRED_DISTINCT_GPUS" ]; then
+    echo "ERROR: Assigned MIGs are not spread across $REQUIRED_DISTINCT_GPUS physical GPUs."
     echo "ERROR: CUDA_VISIBLE_DEVICES=$ASSIGNED_MIGS"
     echo "ERROR: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
     exit "$BAD_MIG_EXIT_CODE"
 fi
 
-REAL_MIG_UUIDS=$(echo "$SELECTED_MIGS" | awk -F',' -v required="$REQUIRED_MIGS" '
+REAL_MIG_UUIDS=$(echo "$SELECTED_MIGS" | awk -F',' -v required="$TRAIN_GPUS_PER_NODE" '
     {
         for (i = 1; i <= NF && i <= required; ++i) {
             printf "%s%s", $i, (i < required ? "," : "")
@@ -128,8 +131,9 @@ echo "DEBUG: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
 echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
 echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 
-TRAIN_GPUS_PER_NODE=$REQUIRED_MIGS
 ROLLOUT_TP_SIZE=2
+echo "DEBUG: REQUESTED_MIGS=$REQUESTED_MIGS"
+echo "DEBUG: REQUIRED_DISTINCT_GPUS=$REQUIRED_DISTINCT_GPUS"
 echo "DEBUG: TRAIN_GPUS_PER_NODE=$TRAIN_GPUS_PER_NODE"
 echo "DEBUG: ROLLOUT_TP_SIZE=$ROLLOUT_TP_SIZE"
 # --- MIG 环境关键修复结束 ---
