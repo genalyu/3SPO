@@ -58,7 +58,7 @@ def run_ppo(config) -> None:
     # TaskRunner is an orchestrator and doesn't need a dedicated GPU.
     # We set num_gpus=0 to avoid consuming a GPU slot that training workers need,
     # but it will still inherit CUDA_VISIBLE_DEVICES from the ray.init runtime_env.
-    runner = TaskRunner.options(num_gpus=0).remote()
+    runner = TaskRunner.options(num_gpus=0.01).remote()
     ray.get(runner.run.remote(config))
 
 
