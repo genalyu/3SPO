@@ -59,7 +59,11 @@ def run_ppo(config) -> None:
     # environment variable 'VERL_ALL_MIG_IDS' to TaskRunner. 
     # This allows the isolation logic in base.py to correctly partition 
     # them among all training workers.
-    all_mig_ids = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+    all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
+    
+    # Debug: verify environment variables before launching TaskRunner
+    print(f"Step: Launching TaskRunner with VERL_ALL_MIG_IDS={all_mig_ids}", flush=True)
+    
     runner = TaskRunner.options(
         num_cpus=1, 
         num_gpus=0.01,

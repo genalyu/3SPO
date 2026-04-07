@@ -239,6 +239,9 @@ class RayClassWithInitArgs(ClassWithInitArgs):
             # CUDA_VISIBLE_DEVICES if TaskRunner was given the full list.
             all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
             
+            # DEBUG: Print for investigation
+            # print(f"DEBUG [base.py]: VERL_ALL_MIG_IDS={os.environ.get('VERL_ALL_MIG_IDS')}, CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}", flush=True)
+
             if "MIG-" in all_mig_ids:
                 mig_uuids = [id.strip() for id in all_mig_ids.split(",") if "MIG-" in id]
                 # Use the bundle index to pick a unique MIG UUID for this actor
@@ -255,8 +258,11 @@ class RayClassWithInitArgs(ClassWithInitArgs):
                     # Critical: Set BOTH CUDA and NVIDIA visible devices
                     options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
                     options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
-                    # print(f"DEBUG: Manually assigned MIG {my_mig_uuid} to actor at bundle {placement_group_bundle_idx}")
+                    # print(f"DEBUG: Manually assigned MIG {my_mig_uuid} to actor at bundle {placement_group_bundle_idx}", flush=True)
                 
+                # In MIG environments, setting num_gpus to 0 and manually managing
+                # visibility via env vars is the only reliable way to ensure 
+                # correct partitioning and avoid Ray internal IndexErrors.
                 options["num_gpus"] = 0
             else:
                 options["num_gpus"] = 1
