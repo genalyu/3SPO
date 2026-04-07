@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:2
 #SBATCH --mem=512G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_alfworld.out
@@ -51,9 +51,31 @@ echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
 echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi -L
 
-# 在某些集群上，SLURM 给的是索引 (0,1,2,3) 但在 MIG 开启时 PyTorch 需要真实的 MIG UUID
-# 我们使用更健壮的方式提取 MIG UUID
-REAL_MIG_UUIDS=$(nvidia-smi -L | grep -o 'MIG-[^)]*' | paste -sd "," -)
+# 在某些集群上，SLURM 给的是索引 (0,1,2,3) 但在 MIG 开启时 PyTorch 需要真实的 MIG UUID。
+# 这里按“每张物理 GPU 最多选一个 MIG”来构造可见设备，避免同卡多个 MIG
+# 被 NCCL/FSDP 识别为 Duplicate GPU。
+REAL_MIG_UUIDS=$(nvidia-smi -L | awk '
+    /^GPU [0-9]+:/ {
+        current_gpu=$2
+        sub(":", "", current_gpu)
+        next
+    }
+    /MIG-[^)]+/ {
+        if (!(current_gpu in seen_gpu)) {
+            match($0, /MIG-[^)]+/)
+            if (RSTART > 0) {
+                mig=substr($0, RSTART, RLENGTH)
+                migs[++count]=mig
+                seen_gpu[current_gpu]=1
+            }
+        }
+    }
+    END {
+        for (i=1; i<=count; ++i) {
+            printf "%s%s", migs[i], (i < count ? "," : "")
+        }
+    }
+')
 if [ ! -z "$REAL_MIG_UUIDS" ]; then
     echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
     export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
