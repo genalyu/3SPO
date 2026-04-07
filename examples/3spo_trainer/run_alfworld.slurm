@@ -28,7 +28,6 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 # 因为 MIG 实例之间在物理上无法直接 P2P 访问
 export NCCL_P2P_DISABLE=1
 export NCCL_SHM_DISABLE=1
-
 # 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
 export VLLM_SKIP_P2P_CHECK=1
 # 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
@@ -39,6 +38,8 @@ export RAY_EXPORT_CUDA_VISIBLE_DEVICES=1
 export NCCL_IB_DISABLE=1 
 
 # 开启 NCCL 调试日志，如果出错，日志里会告诉你具体是哪两张卡在打架
+export CUDA_LAUNCH_BLOCKING=1
+export TORCH_DISTRIBUTED_DEBUG=INFO
 export NCCL_DEBUG=INFO 
 
 # 调试：打印环境中的 GPU 变量
@@ -61,7 +62,7 @@ fi
 ray stop --force
 
 ENGINE=${1:-vllm}
-num_cpus_per_env_worker=0.1
+num_cpus_per_env_worker=1.0
 
 train_data_size=16
 val_data_size=128
