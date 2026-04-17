@@ -46,7 +46,7 @@ for eval_experiment_name in "${eval_experiment_names[@]}"; do
     fi
 
     # create log directory
-    log_dir="logs/${eval_dir}"
+    log_dir="logs"
     mkdir -p "$log_dir"
 
     for seed in "${seeds[@]}"; do
@@ -57,7 +57,7 @@ for eval_experiment_name in "${eval_experiment_names[@]}"; do
         temp_log="${log_dir}/output_seed${seed}.log"
 
         python3 -m verl.trainer.main_ppo \
-            --config-path=../../recipe/hgpo/config \
+            --config-path=recipe/hgpo/config \
             --config-name=hgpo_trainer \
             algorithm.adv_estimator=hgpo \
             data.train_files=$HOME/data/verl-agent/text/train.parquet \
