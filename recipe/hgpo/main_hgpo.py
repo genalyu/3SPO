@@ -108,7 +108,6 @@ class TaskRunner:
 
         role_worker_mapping = {
             Role.ActorRollout: ray.remote(actor_rollout_cls),
-            Role.Critic: ray.remote(CriticWorker),
         }
 
         global_pool_id = "global_pool"
@@ -117,8 +116,12 @@ class TaskRunner:
         }
         mapping = {
             Role.ActorRollout: global_pool_id,
-            Role.Critic: global_pool_id,
         }
+
+        # Skip Critic worker in val_only mode to save GPU memory
+        if not config.trainer.get("val_only", False):
+            role_worker_mapping[Role.Critic] = ray.remote(CriticWorker)
+            mapping[Role.Critic] = global_pool_id
 
         # we should adopt a multi-source reward function here
         # - for rule-based rm, we directly call a reward score

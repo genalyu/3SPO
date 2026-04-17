@@ -11,7 +11,7 @@ export CUDA_VISIBLE_DEVICES=0,1 # cuda visible devices
 
 num_cpus_per_env_worker=0.1 # The CPU resource allocated for each environment worker. If you want to use less CPU resources, you can decrease this value.
 eval_out=True # True for evaluation on in-domain data, False for evaluation on out-of-domain data
-seeds=(123 789)  # three random seeds for evaluation
+seeds=(123)  # three random seeds for evaluation
 
 # multiple eval experiment names
 eval_experiment_names=(

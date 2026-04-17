@@ -28,11 +28,11 @@ omega_k=0.1
 
 python3 -m gigpo.main_3spo \
     algorithm.adv_estimator=grpo \
-    algorithm.spo3_alpha=$alpha \
-    algorithm.spo3_xi=$xi \
-    algorithm.spo3_zeta=$zeta \
-    algorithm.spo3_beta=$beta \
-    algorithm.spo3_omega_k=$omega_k \
+    +algorithm.spo3_alpha=$alpha \
+    +algorithm.spo3_xi=$xi \
+    +algorithm.spo3_zeta=$zeta \
+    +algorithm.spo3_beta=$beta \
+    +algorithm.spo3_omega_k=$omega_k \
     data.train_files=$HOME/data/verl-agent/text/train.parquet \
     data.val_files=$HOME/data/verl-agent/text/test.parquet \
     data.train_batch_size=$train_data_size \
