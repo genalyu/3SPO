@@ -19,7 +19,7 @@ eval_experiment_names=(
     # example: "k2_hgpo_length_alpha1.0_baseGroup_False"
     #example: "k4_hgpo_length_alpha1.0_baseGroup_False"
 )
-CHECKPOINTS_DIR=${~/project/verl-agent/checkpoints/alfworld/1833} # checkpoints directory
+CHECKPOINTS_DIR=~/project/verl-agent/checkpoints/alfworld/1833 # checkpoints directory
 train_data_size=16
 val_data_size=128
 group_size=8
