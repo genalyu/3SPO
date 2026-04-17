@@ -23,7 +23,7 @@ CHECKPOINTS_DIR=~/project/verl-agent/checkpoints/alfworld/1833 # checkpoints dir
 train_data_size=16
 val_data_size=128
 group_size=8
-# mode="mean_std_norm" # "mean_norm" or "mean_std_norm"
+mode="mean_std_norm" # "mean_norm" or "mean_std_norm"
 
 # We only use data preparation to indicate the modality and the data size.
 # python3 -m examples.data_preprocess.prepare \
@@ -57,7 +57,7 @@ for eval_experiment_name in "${eval_experiment_names[@]}"; do
         temp_log="${log_dir}/output_seed${seed}.log"
 
         python3 -m verl.trainer.main_ppo \
-            algorithm.adv_estimator=3spo \
+            algorithm.adv_estimator=hgpo \
             data.train_files=$HOME/data/verl-agent/text/train.parquet \
             data.val_files=$HOME/data/verl-agent/text/test.parquet \
             data.train_batch_size=$train_data_size \
@@ -93,6 +93,7 @@ for eval_experiment_name in "${eval_experiment_names[@]}"; do
             actor_rollout_ref.actor.invalid_action_penalty_coef=0.1 \
             algorithm.use_kl_in_reward=False \
             algorithm.gamma=0.95 \
+            algorithm.hgpo.mode=$mode \
             env.env_name=alfworld/AlfredTWEnv \
             env.resources_per_worker.num_cpus=$num_cpus_per_env_worker \
             env.seed=$seed \
