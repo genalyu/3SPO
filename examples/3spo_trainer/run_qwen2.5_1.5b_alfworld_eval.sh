@@ -1,4 +1,6 @@
 set -x
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate verl-agent-alf
 ENGINE=${1:-vllm}
 ulimit -u 65536
 export VLLM_ATTENTION_BACKEND=XFORMERS
@@ -9,7 +11,7 @@ export CUDA_VISIBLE_DEVICES=0,1 # cuda visible devices
 
 num_cpus_per_env_worker=0.1 # The CPU resource allocated for each environment worker. If you want to use less CPU resources, you can decrease this value.
 eval_out=True # True for evaluation on in-domain data, False for evaluation on out-of-domain data
-seeds=(123 456 789)  # three random seeds for evaluation
+seeds=(123 789)  # three random seeds for evaluation
 
 # multiple eval experiment names
 eval_experiment_names=(
