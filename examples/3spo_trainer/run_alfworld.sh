@@ -12,7 +12,7 @@ val_data_size=128
 group_size=8
 mode="mean_std_norm"
 
-model_path="/public/home/genalyu/models/Qwen2.5-1.5B-Instruct"
+model_path="/public/share/114514/models/Qwen2.5-7B-Instruct"
 
 # 3SPO Parameters
 alpha=1.0
@@ -42,7 +42,7 @@ python3 -m gigpo.main_3spo \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     data.return_raw_chat=True \
-    actor_rollout_ref.model.path=Qwen/Qwen2.5-1.5B-Instruct \
+    actor_rollout_ref.model.path=Qwen/Qwen2.5-7B-Instruct \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=256 \
@@ -76,10 +76,10 @@ python3 -m gigpo.main_3spo \
     trainer.critic_warmup=0 \
     trainer.logger=['console','wandb'] \
     trainer.project_name='verl_agent_alfworld' \
-    trainer.experiment_name='3spo_qwen2.5_1.5b' \
+    trainer.experiment_name='3spo_qwen2.5_7b' \
     trainer.n_gpus_per_node=4 \
     trainer.nnodes=1 \
     trainer.save_freq=100 \
-    trainer.test_freq=200 \
-    trainer.total_epochs=150 \
+    trainer.test_freq=50 \
+    trainer.total_epochs=400 \
     trainer.val_before_train=True $@
