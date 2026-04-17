@@ -13,7 +13,7 @@ val_data_size=128
 group_size=8
 mode="mean_std_norm"
 
-model_path="/public/share/114514/models/Qwen2.5-7B-Instruct"
+model_path="/public/home/genalyu/models/Qwen2.5-7B-Instruct"
 
 # 3SPO Parameters
 alpha=1.0
