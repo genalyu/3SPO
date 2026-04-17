@@ -6,7 +6,7 @@ export WANDB_API_KEY=${WANDB_API_KEY} # wandb api key
 export WANDB_DIR=${WANDB_DIR} # wandb directory
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} # cuda visible devices
 
-project_name="qwen2.5_1.5b_alfworld_train"
+project_name="alfworld"
 history_length=2 # history length 2 or 4
 num_cpus_per_env_worker=0.1 # The CPU resource allocated for each environment worker. If you want to use less CPU resources, you can decrease this value.
 
@@ -19,7 +19,7 @@ length_weight_alpha=1.0  # weight is L^alpha, alpha=0 is uniform weight
 base_group=False  # add episode_advantages as initial group to aggregate weight computation
 
 experiment_name="k${history_length}_hgpo_${weight_type}_alpha${length_weight_alpha}_baseGroup_${base_group}"
-CHECKPOINTS_DIR=${CHECKPOINTS_DIR} # checkpoints directory
+CHECKPOINTS_DIR=${~/project/verl-agent/checkpoints} # checkpoints directory
 
 # We only use data preparation to indicate the modality and the data size.
 python3 -m examples.data_preprocess.prepare \
