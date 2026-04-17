@@ -138,7 +138,7 @@ python3 -m gigpo.main_3spo \
     trainer.experiment_name='3spo_qwen2.5_1.5b_alf' \
     trainer.n_gpus_per_node=$TRAIN_GPUS_PER_NODE \
     trainer.nnodes=1 \
-    trainer.default_local_dir=/public/share/114514/3spo_qwen2.5_1.5b_alf \
+    trainer.default_local_dir=/public/home/genalyu/project/verl-agent/checkpoints/3spo_qwen2.5_1.5b_alf \
     trainer.save_freq=100 \
     trainer.test_freq=50 \
     trainer.total_epochs=400 \
