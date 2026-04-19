@@ -9,8 +9,8 @@ export HF_ENDPOINT=https://hf-mirror.com
 TRAIN_GPUS_PER_NODE=2
 num_cpus_per_env_worker=0.1
 
-train_data_size=16
-val_data_size=128
+train_data_size=8
+val_data_size=8
 group_size=8
 mode="mean_std_norm"
 
