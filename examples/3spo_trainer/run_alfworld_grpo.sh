@@ -67,6 +67,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.default_local_dir=$HOME/project/verl-agent/checkpoints/grpo_qwen2.5_1.5b_alf \
     trainer.nnodes=1 \
     trainer.save_freq=200 \
-    trainer.test_freq=5 \
+    trainer.test_freq=20 \
     trainer.total_epochs=400 \
     trainer.val_before_train=True $@

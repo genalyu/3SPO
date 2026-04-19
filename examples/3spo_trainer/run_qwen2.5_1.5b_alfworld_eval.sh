@@ -20,8 +20,8 @@ eval_experiment_names=(
     #example: "k4_hgpo_length_alpha1.0_baseGroup_False"
 )
 CHECKPOINTS_DIR=~/project/verl-agent/checkpoints/alfworld/1833 # checkpoints directory
-train_data_size=16
-val_data_size=128
+train_data_size=8
+val_data_size=8
 group_size=8
 mode="mean_std_norm" # "mean_norm" or "mean_std_norm"
 
