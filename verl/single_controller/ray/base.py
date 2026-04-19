@@ -73,13 +73,45 @@ def sort_placement_group_by_node_ip(pgs: List[PlacementGroup]) -> List[Placement
     across nodes in multiple ray jobs, even if the whole ray cluster is restarted.
     """
     node_ip = {node["NodeID"]: node["NodeManagerAddress"] for node in ray.nodes()}
-    pg_ip = {}
-    for pg in pgs:
+
+    def _get_node_ip_for_pg(pg):
         specs = ray._private.state.state.placement_group_table(pg.id)
-        # all bunles should be on the same node
-        node_id = specs["bundles_to_node_id"][0]
-        pg_ip[pg.id] = node_ip[node_id]
-    return sorted(pgs, key=lambda pg: pg_ip[pg.id])
+        node_ids = specs.get("bundles_to_node_id", [])
+        if not node_ids:
+            return None
+        node_id = node_ids[0]
+        if not node_id or node_id not in node_ip:
+            return None
+        return node_ip[node_id]
+
+    # Try to resolve node IPs; retry a few times for PGs that haven't been scheduled yet
+    pg_ip: dict = {}
+    unscheduled = list(pgs)
+    for _ in range(5):
+        still_unscheduled = []
+        for pg in unscheduled:
+            ip = _get_node_ip_for_pg(pg)
+            if ip is not None:
+                pg_ip[pg.id] = ip
+            else:
+                still_unscheduled.append(pg)
+        if not still_unscheduled:
+            break
+        unscheduled = still_unscheduled
+        time.sleep(2)
+
+    if unscheduled:
+        logging.warning(
+            f"{len(unscheduled)} placement groups could not be mapped to nodes "
+            f"(bundles not yet scheduled). They will be appended at the end."
+        )
+
+    sorted_pgs = sorted(
+        [pg for pg in pgs if pg.id in pg_ip],
+        key=lambda pg: pg_ip[pg.id],
+    )
+    sorted_pgs.extend(unscheduled)
+    return sorted_pgs
 
 
 class RayResourcePool(ResourcePool):
