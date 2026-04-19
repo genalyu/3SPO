@@ -487,7 +487,9 @@ class RayWorkerGroup(WorkerGroup):
                 if rank == 0:
                     register_center_actor = None
                     actor_name = f"{self.name_prefix}_register_center"
+                    worker_actor_name = name  # The rank-0 worker actor name
                     start_time = time.time()
+                    last_log_time = 0
 
                     while time.time() - start_time < self._ray_wait_register_center_timeout:
                         if actor_name in list_named_actors():
@@ -495,24 +497,57 @@ class RayWorkerGroup(WorkerGroup):
                             break
 
                         elapsed = int(time.time() - start_time)
-                        if elapsed % 30 == 0:
+                        if elapsed - last_log_time >= 30:
+                            last_log_time = elapsed
+                            # Check if the rank-0 worker actor exists and its state
+                            worker_actor_state = "NOT_FOUND"
+                            try:
+                                worker_handle = ray.get_actor(worker_actor_name)
+                                state_dict = get_actor(worker_handle._actor_id.hex())
+                                worker_actor_state = state_dict.get("state", "unknown") if state_dict else "unknown"
+                            except ValueError:
+                                pass  # Actor doesn't exist yet
+                            except Exception as e:
+                                worker_actor_state = f"error: {e}"
+
                             logging.warning(
-                                "Waiting for register center actor %s to be ready. Elapsed time: %s seconds out of %s seconds.",
-                                actor_name,
-                                elapsed,
-                                self._ray_wait_register_center_timeout,
+                                "Waiting for register center actor %s to be ready. "
+                                "Elapsed: %d/%d seconds. Rank-0 worker '%s' state: %s.",
+                                actor_name, elapsed, self._ray_wait_register_center_timeout,
+                                worker_actor_name, worker_actor_state,
                             )
+
+                            # If worker is DEAD, fail fast instead of waiting
+                            if worker_actor_state == "DEAD":
+                                raise RuntimeError(
+                                    f"Rank-0 worker '{worker_actor_name}' is DEAD after {elapsed}s. "
+                                    f"The worker crashed during initialization, so the register center "
+                                    f"was never created. Check Ray logs for the actual error, or run with "
+                                    f"HYDRA_FULL_ERROR=1 for a complete stack trace."
+                                )
                         time.sleep(1)
 
                     if register_center_actor is None:
+                        # Provide detailed diagnostics about what went wrong
+                        named = list_named_actors(all_namespaces=True)
+                        worker_actor_state = "UNKNOWN"
+                        try:
+                            worker_handle = ray.get_actor(worker_actor_name)
+                            state_dict = get_actor(worker_handle._actor_id.hex())
+                            worker_actor_state = state_dict.get("state", "unknown") if state_dict else "unknown"
+                        except ValueError:
+                            worker_actor_state = "NOT_FOUND"
+                        except Exception as e:
+                            worker_actor_state = f"error: {e}"
+
                         raise TimeoutError(
                             f"Failed to get register_center_actor {actor_name} "
-                            f"in {list_named_actors(all_namespaces=True)} "
+                            f"in {named} "
                             f"for {self._ray_wait_register_center_timeout} seconds. "
-                            "Ensure that any lingering Ray resources from previous "
-                            "runs are cleaned up (e.g., by restarting the Ray cluster), "
-                            "or adjust the waiting time by modifying the config "
-                            "`trainer.ray_wait_register_center_timeout`."
+                            f"Rank-0 worker '{worker_actor_name}' state: {worker_actor_state}. "
+                            f"This usually means the rank-0 worker actor failed to start or crashed. "
+                            f"Check Ray logs for worker stderr output, or try running with "
+                            f"HYDRA_FULL_ERROR=1 for a complete stack trace."
                         )
 
                     rank_zero_info = ray.get(register_center_actor.get_rank_zero_info.remote())
