@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --gres=gpu:1g.35gb:2
+#SBATCH --gres=gpu:1g.35gb:5
 #SBATCH --mem=512G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_alfworld_eval.out
@@ -41,7 +41,11 @@ export TORCH_DISTRIBUTED_DEBUG=INFO
 export NCCL_DEBUG=INFO
 
 # MIG 环境配置
+# 调度层申请 5 个 MIG，但训练时只使用来自 2 张不同物理 GPU 的 2 个 MIG。
+REQUESTED_MIGS=5
+REQUIRED_DISTINCT_GPUS=2
 TRAIN_GPUS_PER_NODE=2
+BAD_MIG_EXIT_CODE=42
 
 # 调试：打印环境中的 GPU 变量
 echo "DEBUG: SLURM_JOB_GPUS=$SLURM_JOB_GPUS"
@@ -49,16 +53,78 @@ echo "DEBUG: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi -L
 
 ALL_GPU_LISTING=$(nvidia-smi -L)
+DISTINCT_PARENT_GPUS=""
+SELECTED_MIGS=""
 
-# 收集所有可见的 MIG UUID（用于 worker 隔离和 VERL_ALL_MIG_IDS）
-if [ -n "${CUDA_VISIBLE_DEVICES:-}" ] && echo "$CUDA_VISIBLE_DEVICES" | grep -q 'MIG-'; then
-    REAL_MIG_UUIDS="$CUDA_VISIBLE_DEVICES"
-elif [ -n "${SLURM_JOB_GPUS:-}" ] && echo "$SLURM_JOB_GPUS" | grep -q 'MIG-'; then
-    REAL_MIG_UUIDS="$SLURM_JOB_GPUS"
-else
-    # 从 nvidia-smi 提取 MIG UUID
-    REAL_MIG_UUIDS=$(echo "$ALL_GPU_LISTING" | grep -oP 'MIG-[^)]+' | head -n $TRAIN_GPUS_PER_NODE | tr '\n' ',' | sed 's/,$//')
+# 有些集群在 MIG GRES 模式下会把 CUDA_VISIBLE_DEVICES 设为索引而不是 MIG UUID。
+# 这里统一从当前可见的 nvidia-smi -L 中挑选 MIG，并优先在不同物理 GPU 间分散。
+if [ -z "${CUDA_VISIBLE_DEVICES:-}" ]; then
+    echo "ERROR: CUDA_VISIBLE_DEVICES is empty under MIG GRES allocation."
+    exit "$BAD_MIG_EXIT_CODE"
 fi
+
+if echo "$CUDA_VISIBLE_DEVICES" | grep -q 'MIG-'; then
+    CANDIDATE_MIGS=$(echo "$CUDA_VISIBLE_DEVICES" | tr ',' '\n')
+else
+    echo "DEBUG: CUDA_VISIBLE_DEVICES contains indices, deriving MIG candidates from nvidia-smi -L"
+    CANDIDATE_MIGS=$(echo "$ALL_GPU_LISTING" | grep -o 'MIG-[^)]*' || true)
+fi
+
+ASSIGNED_MIG_COUNT=$(echo "$CANDIDATE_MIGS" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+if [ "$ASSIGNED_MIG_COUNT" -lt "$REQUESTED_MIGS" ]; then
+    echo "ERROR: Visible MIG candidates only $ASSIGNED_MIG_COUNT, require at least $REQUESTED_MIGS."
+    echo "ERROR: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+    exit "$BAD_MIG_EXIT_CODE"
+fi
+
+while IFS= read -r mig_uuid; do
+    mig_uuid=$(echo "$mig_uuid" | xargs)
+    [ -z "$mig_uuid" ] && continue
+
+    parent_gpu=$(echo "$ALL_GPU_LISTING" | awk -v target="$mig_uuid" '
+        /^GPU [0-9]+:/ {
+            current_gpu=$2
+            sub(":", "", current_gpu)
+        }
+        index($0, target) {
+            print current_gpu
+            exit
+        }
+    ')
+
+    if [ -z "$parent_gpu" ]; then
+        echo "ERROR: Could not map MIG $mig_uuid to a physical GPU."
+        exit "$BAD_MIG_EXIT_CODE"
+    fi
+
+    if ! echo ",$DISTINCT_PARENT_GPUS," | grep -q ",$parent_gpu,"; then
+        if [ -n "$DISTINCT_PARENT_GPUS" ]; then
+            DISTINCT_PARENT_GPUS="${DISTINCT_PARENT_GPUS},${parent_gpu}"
+            SELECTED_MIGS="${SELECTED_MIGS},${mig_uuid}"
+        else
+            DISTINCT_PARENT_GPUS="$parent_gpu"
+            SELECTED_MIGS="$mig_uuid"
+        fi
+    fi
+done <<< "$CANDIDATE_MIGS"
+
+DISTINCT_PARENT_COUNT=$(echo "$DISTINCT_PARENT_GPUS" | awk -F',' '{print NF}')
+if [ "$DISTINCT_PARENT_COUNT" -lt "$REQUIRED_DISTINCT_GPUS" ]; then
+    echo "ERROR: Assigned MIGs are not spread across $REQUIRED_DISTINCT_GPUS physical GPUs."
+    echo "ERROR: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+    echo "ERROR: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
+    exit "$BAD_MIG_EXIT_CODE"
+fi
+
+REAL_MIG_UUIDS=$(echo "$SELECTED_MIGS" | awk -F',' -v required="$TRAIN_GPUS_PER_NODE" '
+    {
+        for (i = 1; i <= NF && i <= required; ++i) {
+            printf "%s%s", $i, (i < required ? "," : "")
+        }
+    }
+')
+echo "DEBUG: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
+echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
 
 # Ray 不识别 MIG UUID，CUDA_VISIBLE_DEVICES 必须用数字索引
 # 保留 UUID 在 VERL_ALL_MIG_IDS 中供 worker 隔离使用
@@ -72,8 +138,9 @@ for i in $(seq 0 $((TRAIN_GPUS_PER_NODE - 1))); do
 done
 export CUDA_VISIBLE_DEVICES=$TRAIN_GPU_INDICES
 export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
-echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
 echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+
+# --- MIG 环境关键修复结束 ---
 
 ENGINE=${1:-vllm}
 num_cpus_per_env_worker=0.1
