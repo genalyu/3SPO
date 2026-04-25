@@ -2,7 +2,7 @@
 #SBATCH --job-name=alfworld_grpo
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=24
 #SBATCH --gres=gpu:1g.35gb:5
 #SBATCH --mem=512G
 #SBATCH --partition=H200
@@ -15,6 +15,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate verl-agent-alf
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONUNBUFFERED=1
+export WANDB_MODE=offline  # Enable offline WandB
 export VLLM_ATTENTION_BACKEND=FLASH_ATTN
 export HF_ENDPOINT=https://hf-mirror.com
 # 在 NVIDIA 环境下，显式清除 AMD 和 NPU 特有的变量，防止后端冲突报错
@@ -27,11 +28,17 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 # 因为 MIG 实例之间在物理上无法直接 P2P 访问
 export NCCL_P2P_DISABLE=1
 export NCCL_SHM_DISABLE=1
+# 增加这个变量，告诉 NCCL 忽略由于 P2P 被禁用引发的额外拓扑检查
 export NCCL_IGNORE_DISABLED_P2P=1
+# 允许 vLLM 忽略 P2P 检查，在 MIG 环境下这是必要的
 export VLLM_SKIP_P2P_CHECK=1
+# 如果仍然报错 Duplicate GPU，尝试开启 Ray 的 MIG 支持
 export RAY_EXPERIMENTAL_NO_GCS_CHECK=1
+# 强制导出环境变量给 Ray Actor (关键！)
 export RAY_EXPORT_CUDA_VISIBLE_DEVICES=1
+# 禁止 Ray 在 actor 启动时自动清空/重写 CUDA_VISIBLE_DEVICES
 export RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES=1
+# 某些集群需要强制禁用 IB 通信来配合 MIG，如果报错继续，请取消下面这行的注释
 export NCCL_IB_DISABLE=1
 
 # 开启 NCCL 调试日志，如果出错，日志里会告诉你具体是哪两张卡在打架
@@ -122,21 +129,10 @@ REAL_MIG_UUIDS=$(echo "$SELECTED_MIGS" | awk -F',' -v required="$TRAIN_GPUS_PER_
         }
     }
 ')
+export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
 echo "DEBUG: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
 echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
-
-# Ray 不识别 MIG UUID，CUDA_VISIBLE_DEVICES 必须用数字索引
-# 保留 UUID 在 VERL_ALL_MIG_IDS 中供 worker 隔离使用
-TRAIN_GPU_INDICES=""
-for i in $(seq 0 $((TRAIN_GPUS_PER_NODE - 1))); do
-    if [ -n "$TRAIN_GPU_INDICES" ]; then
-        TRAIN_GPU_INDICES="${TRAIN_GPU_INDICES},${i}"
-    else
-        TRAIN_GPU_INDICES="${i}"
-    fi
-done
-export CUDA_VISIBLE_DEVICES=$TRAIN_GPU_INDICES
-export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
 echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 
 ROLLOUT_TP_SIZE=2

@@ -444,27 +444,16 @@ class RayWorkerGroup(WorkerGroup):
                     "ASCEND_VISIBLE_DEVICES": "",
                 }
                 
-                # Manual MIG isolation: restrict each worker to its assigned MIG
-                # Use numeric indices (not MIG UUIDs) for CUDA_VISIBLE_DEVICES,
-                # since Ray crashes on MIG UUID strings.
+                # Manual MIG isolation: pick only the UUID for this local rank
                 cvd_val = all_visible_devices
                 if cvd_val:
                     cvd_list = cvd_val.split(",")
                     if len(cvd_list) > local_rank:
-                        mig_uuid = cvd_list[local_rank]
-                        # Find the numeric index of this MIG UUID in the visible list
-                        if "MIG-" in mig_uuid:
-                            # MIG UUID — use index within the visible list
-                            mig_index = local_rank
-                            env_vars["CUDA_VISIBLE_DEVICES"] = str(mig_index)
-                            env_vars["NVIDIA_VISIBLE_DEVICES"] = str(mig_index)
-                            # Store UUID for PyTorch/NCCL device identification
-                            env_vars["NVIDIA_MIG_UUID"] = mig_uuid
-                        else:
-                            # Already a numeric index
-                            env_vars["CUDA_VISIBLE_DEVICES"] = mig_uuid
-                            env_vars["NVIDIA_VISIBLE_DEVICES"] = mig_uuid
-                        # Once visibility is restricted to a single device,
+                        # Assign only the specific MIG partition to this rank
+                        env_vars["CUDA_VISIBLE_DEVICES"] = cvd_list[local_rank]
+                        # Some frameworks use these as fallback
+                        env_vars["NVIDIA_VISIBLE_DEVICES"] = cvd_list[local_rank]
+                        # Once visibility is restricted to a single MIG UUID,
                         # the process should treat it as cuda:0.
                         env_vars["LOCAL_RANK"] = "0"
                         env_vars["RAY_LOCAL_RANK"] = "0"

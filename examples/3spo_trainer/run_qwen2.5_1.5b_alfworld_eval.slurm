@@ -2,7 +2,7 @@
 #SBATCH --job-name=alfworld_eval
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=24
 #SBATCH --gres=gpu:1g.35gb:5
 #SBATCH --mem=512G
 #SBATCH --partition=H200
@@ -16,6 +16,7 @@ conda activate verl-agent-alf
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONUNBUFFERED=1
 export VLLM_ATTENTION_BACKEND=FLASH_ATTN
+export WANDB_MODE=offline  # Enable offline WandB
 export WANDB_DIR=${WANDB_DIR}
 export HF_ENDPOINT=https://hf-mirror.com
 # 在 NVIDIA 环境下，显式清除 AMD 和 NPU 特有的变量，防止后端冲突报错
@@ -40,7 +41,7 @@ export CUDA_LAUNCH_BLOCKING=1
 export TORCH_DISTRIBUTED_DEBUG=INFO
 export NCCL_DEBUG=INFO
 
-# MIG 环境配置
+# 原生 MIG GRES 模式：
 # 调度层申请 5 个 MIG，但训练时只使用来自 2 张不同物理 GPU 的 2 个 MIG。
 REQUESTED_MIGS=5
 REQUIRED_DISTINCT_GPUS=2
@@ -123,21 +124,10 @@ REAL_MIG_UUIDS=$(echo "$SELECTED_MIGS" | awk -F',' -v required="$TRAIN_GPUS_PER_
         }
     }
 ')
+export CUDA_VISIBLE_DEVICES=$REAL_MIG_UUIDS
+export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
 echo "DEBUG: Distinct parent GPUs=$DISTINCT_PARENT_GPUS"
 echo "DEBUG: Detected MIG UUIDs: $REAL_MIG_UUIDS"
-
-# Ray 不识别 MIG UUID，CUDA_VISIBLE_DEVICES 必须用数字索引
-# 保留 UUID 在 VERL_ALL_MIG_IDS 中供 worker 隔离使用
-TRAIN_GPU_INDICES=""
-for i in $(seq 0 $((TRAIN_GPUS_PER_NODE - 1))); do
-    if [ -n "$TRAIN_GPU_INDICES" ]; then
-        TRAIN_GPU_INDICES="${TRAIN_GPU_INDICES},${i}"
-    else
-        TRAIN_GPU_INDICES="${i}"
-    fi
-done
-export CUDA_VISIBLE_DEVICES=$TRAIN_GPU_INDICES
-export VERL_ALL_MIG_IDS=$REAL_MIG_UUIDS
 echo "DEBUG: Final CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 
 # --- MIG 环境关键修复结束 ---
