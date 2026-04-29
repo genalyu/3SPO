@@ -207,4 +207,4 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=200 \
     trainer.test_freq=20 \
     trainer.total_epochs=400 \
-    trainer.val_before_train=True $@ 2>&1 | tee logs/grpo_qwen2.5_1.5b.log
+    trainer.val_before_train=True

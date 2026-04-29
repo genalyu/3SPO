@@ -227,7 +227,7 @@ for eval_experiment_name in "${eval_experiment_names[@]}"; do
             trainer.default_local_dir=$eval_dir \
             trainer.val_only=True \
             trainer.val_out=$eval_out \
-            trainer.val_before_train=True $@ 2>&1 | tee "$temp_log"
+            trainer.val_before_train=True
         echo "Completed: $eval_experiment_name, seed: $seed"
         echo ""
     done
