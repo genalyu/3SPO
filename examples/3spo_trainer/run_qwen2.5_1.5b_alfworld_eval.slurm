@@ -36,10 +36,10 @@ export RAY_EXPORT_CUDA_VISIBLE_DEVICES=1
 export RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES=1
 export NCCL_IB_DISABLE=1
 
-# 开启 NCCL 调试日志
-export CUDA_LAUNCH_BLOCKING=1
-export TORCH_DISTRIBUTED_DEBUG=INFO
-export NCCL_DEBUG=INFO
+# NCCL debugging only when needed — disable for normal runs to reduce overhead
+# export CUDA_LAUNCH_BLOCKING=1
+# export TORCH_DISTRIBUTED_DEBUG=INFO
+# export NCCL_DEBUG=INFO
 
 # 原生 MIG GRES 模式：
 # 调度层申请 5 个 MIG，但训练时只使用来自 2 张不同物理 GPU 的 2 个 MIG。
@@ -186,14 +186,14 @@ for eval_experiment_name in "${eval_experiment_names[@]}"; do
             actor_rollout_ref.actor.optim.lr=1e-6 \
             actor_rollout_ref.model.use_remove_padding=True \
             actor_rollout_ref.actor.ppo_mini_batch_size=256 \
-            actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=32 \
+            actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=16 \
             actor_rollout_ref.actor.use_kl_loss=True \
             actor_rollout_ref.actor.kl_loss_coef=0.01 \
             actor_rollout_ref.actor.kl_loss_type=low_var_kl \
             actor_rollout_ref.model.enable_gradient_checkpointing=True \
             actor_rollout_ref.actor.fsdp_config.param_offload=False \
             actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
-            actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=32 \
+            actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=16 \
             actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
             actor_rollout_ref.rollout.name=$ENGINE \
             actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
@@ -202,7 +202,7 @@ for eval_experiment_name in "${eval_experiment_names[@]}"; do
             actor_rollout_ref.rollout.free_cache_engine=False \
             actor_rollout_ref.rollout.val_kwargs.temperature=0.4 \
             actor_rollout_ref.rollout.val_kwargs.do_sample=True \
-            actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=32 \
+            actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=16 \
             actor_rollout_ref.ref.fsdp_config.param_offload=True \
             actor_rollout_ref.actor.use_invalid_action_penalty=True \
             actor_rollout_ref.actor.invalid_action_penalty_coef=0.1 \
