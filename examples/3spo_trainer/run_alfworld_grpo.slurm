@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
-#SBATCH --gres=gpu:1g.35gb:5
+#SBATCH --gres=gpu:1g.35gb:2
 #SBATCH --mem=360G
 #SBATCH --partition=H200
 #SBATCH --output=logs/%j_alfworld_grpo.out
