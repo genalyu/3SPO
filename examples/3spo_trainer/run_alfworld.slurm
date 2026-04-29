@@ -42,10 +42,12 @@ export RAY_EXPERIMENTAL_NOSET_CUDA_VISIBLE_DEVICES=1
 # 某些集群需要强制禁用 IB 通信来配合 MIG，如果报错继续，请取消下面这行的注释
 export NCCL_IB_DISABLE=1 
 
-# 开启 NCCL 调试日志，如果出错，日志里会告诉你具体是哪两张卡在打架
-export CUDA_LAUNCH_BLOCKING=1
-export TORCH_DISTRIBUTED_DEBUG=INFO
-export NCCL_DEBUG=INFO 
+# 注释掉调试变量，它们会导致 CUDA 同步执行和大量日志输出，
+# 在 MIG 环境下会使模型初始化变得极慢甚至看起来卡死。
+# 如需调试，可临时取消注释。
+# export CUDA_LAUNCH_BLOCKING=1
+# export TORCH_DISTRIBUTED_DEBUG=INFO
+# export NCCL_DEBUG=WARN 
 
 # 原生 MIG GRES 模式：
 # 调度层申请 5 个 MIG，但训练时只使用来自 2 张不同物理 GPU 的 2 个 MIG。
