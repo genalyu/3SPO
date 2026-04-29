@@ -265,26 +265,32 @@ class RayClassWithInitArgs(ClassWithInitArgs):
 
         if use_gpu and device_name == "cuda":
             # Manual MIG isolation to bypass Ray's buggy resource manager.
-            # We get the FULL list of MIG UUIDs from our special env var 
+            # We get the FULL list of MIG UUIDs from our special env var
             # 'VERL_ALL_MIG_IDS' (which we injected in ray.init).
             all_mig_ids = os.environ.get("VERL_ALL_MIG_IDS", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
-            
+
             if "MIG-" in all_mig_ids:
                 mig_uuids = [id.strip() for id in all_mig_ids.split(",") if "MIG-" in id]
                 if mig_uuids:
-                    # Deterministic partitioning using bundle index
-                    # This ensures each Rank gets a unique MIG ID from the full list
-                    my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
-                    
-                    if "runtime_env" not in options:
-                        options["runtime_env"] = {}
-                    if "env_vars" not in options["runtime_env"]:
-                        options["runtime_env"]["env_vars"] = {}
-                    
-                    options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
-                    options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
-                    # print(f"DEBUG [base.py]: Partitioned MIG {my_mig_uuid} for bundle {placement_group_bundle_idx}", flush=True)
-                
+                    # Check if CUDA_VISIBLE_DEVICES was already set to all MIG UUIDs
+                    # by _init_with_resource_pool. In this case, keep it as-is so that
+                    # NCCL can see all devices for correct topology detection (nNodes=1).
+                    # Each rank will use torch.cuda.set_device(rank % num_migs) to select
+                    # its own MIG device.
+                    existing_cvd = options.get("runtime_env", {}).get("env_vars", {}).get("CUDA_VISIBLE_DEVICES", "")
+                    if "MIG-" not in existing_cvd:
+                        # Not already set: partition to a single MIG for this bundle
+                        my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
+
+                        if "runtime_env" not in options:
+                            options["runtime_env"] = {}
+                        if "env_vars" not in options["runtime_env"]:
+                            options["runtime_env"]["env_vars"] = {}
+
+                        options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
+                        options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
+                        # print(f"DEBUG [base.py]: Partitioned MIG {my_mig_uuid} for bundle {placement_group_bundle_idx}", flush=True)
+
                 # In MIG mode, let the placement group reserve the GPU-shaped bundle
                 # and rely on manually injected CUDA_VISIBLE_DEVICES for isolation.
                 # Requesting num_gpus here makes Ray run its internal accelerator-id

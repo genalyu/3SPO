@@ -112,10 +112,15 @@ class ActorRolloutRefWorker(Worker):
             rank = int(os.environ.get("RANK", 0))
             world_size = int(os.environ.get("WORLD_SIZE", 1))
             local_rank = int(os.environ.get("LOCAL_RANK", 0))
-            # In MIG mode, CUDA_VISIBLE_DEVICES contains all MIG UUIDs.
-            # Set the current device to local_rank so each rank uses its own MIG.
-            # This also ensures NCCL detects correct topology (nNodes=1).
-            torch.cuda.set_device(local_rank)
+
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
+                num_migs = len(mig_uuids)
+                device_idx = rank % num_migs
+            else:
+                device_idx = local_rank
+            torch.cuda.set_device(device_idx)
             torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
         # build device mesh for FSDP
@@ -813,7 +818,15 @@ class CriticWorker(Worker):
             local_rank = int(os.environ.get("LOCAL_RANK", 0))
             rank = int(os.environ.get("RANK", 0))
             world_size = int(os.environ.get("WORLD_SIZE", 1))
-            torch.cuda.set_device(local_rank)
+
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
+                num_migs = len(mig_uuids)
+                device_idx = rank % num_migs
+            else:
+                device_idx = local_rank
+            torch.cuda.set_device(device_idx)
             torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
         self.config = config
 
@@ -1155,7 +1168,15 @@ class RewardModelWorker(Worker):
             local_rank = int(os.environ.get("LOCAL_RANK", 0))
             rank = int(os.environ.get("RANK", 0))
             world_size = int(os.environ.get("WORLD_SIZE", 1))
-            torch.cuda.set_device(local_rank)
+
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
+                num_migs = len(mig_uuids)
+                device_idx = rank % num_migs
+            else:
+                device_idx = local_rank
+            torch.cuda.set_device(device_idx)
             torch.distributed.init_process_group(backend="nccl" if is_cuda_available else "hccl", rank=rank, world_size=world_size)
         self.config = config
 
