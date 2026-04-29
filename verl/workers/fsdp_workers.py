@@ -111,7 +111,11 @@ class ActorRolloutRefWorker(Worker):
         if not torch.distributed.is_initialized():
             rank = int(os.environ.get("RANK", 0))
             world_size = int(os.environ.get("WORLD_SIZE", 1))
-            # Dynamic check to ensure GPUs are visible before init
+            local_rank = int(os.environ.get("LOCAL_RANK", 0))
+            # In MIG mode, CUDA_VISIBLE_DEVICES contains all MIG UUIDs.
+            # Set the current device to local_rank so each rank uses its own MIG.
+            # This also ensures NCCL detects correct topology (nNodes=1).
+            torch.cuda.set_device(local_rank)
             torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
         # build device mesh for FSDP
@@ -227,14 +231,7 @@ class ActorRolloutRefWorker(Worker):
             print(f"Model config after override: {actor_model_config}")
 
         # NOTE(fix me): tie_word_embedding causes meta_tensor init to hang
-        # In MIG environments, NCCL broadcast in FSDP sync_module_states can hang.
-        # For FSDP1, skip meta initialization so all ranks load real weights independently.
-        # For FSDP2, keep meta init since fsdp2_load_full_state_dict loads independently.
-        fsdp_strategy = self.config.actor.strategy
-        use_meta_tensor = not actor_model_config.tie_word_embeddings
-        if fsdp_strategy == "fsdp":
-            use_meta_tensor = False  # FSDP1: load full weights on all ranks to avoid sync_module_states broadcast
-        init_context = get_init_weight_context_manager(use_meta_tensor=use_meta_tensor, mesh=self.device_mesh)
+        init_context = get_init_weight_context_manager(use_meta_tensor=not actor_model_config.tie_word_embeddings, mesh=self.device_mesh)
 
         with init_context(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -333,7 +330,7 @@ class ActorRolloutRefWorker(Worker):
                 device_id=get_torch_device().current_device(),
                 sharding_strategy=sharding_strategy,  # zero3
                 mixed_precision=mixed_precision,
-                sync_module_states=False,  # Disabled: all ranks loaded full weights independently (MIG fix)
+                sync_module_states=True,
                 device_mesh=self.device_mesh,
                 forward_prefetch=False,
             )
@@ -813,7 +810,11 @@ class CriticWorker(Worker):
         import torch.distributed
 
         if not torch.distributed.is_initialized():
-            torch.distributed.init_process_group(backend="nccl")
+            local_rank = int(os.environ.get("LOCAL_RANK", 0))
+            rank = int(os.environ.get("RANK", 0))
+            world_size = int(os.environ.get("WORLD_SIZE", 1))
+            torch.cuda.set_device(local_rank)
+            torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
         self.config = config
 
         # build device mesh for Ulysses Sequence Parallel
@@ -890,10 +891,7 @@ class CriticWorker(Worker):
         if getattr(critic_model_config, "model_type", None) == "kimi_vl":
             critic_model_config.text_config.topk_method = "greedy"
 
-        init_context = get_init_weight_context_manager(
-            use_meta_tensor=not critic_model_config.tie_word_embeddings and config.strategy != "fsdp",
-            mesh=self.device_mesh,
-        )
+        init_context = get_init_weight_context_manager(use_meta_tensor=not critic_model_config.tie_word_embeddings, mesh=self.device_mesh)
 
         with init_context(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -968,7 +966,7 @@ class CriticWorker(Worker):
                 device_id=get_torch_device().current_device(),
                 sharding_strategy=sharding_strategy,
                 mixed_precision=mixed_precision,
-                sync_module_states=False,  # Disabled: all ranks loaded full weights independently (MIG fix)
+                sync_module_states=True,
                 forward_prefetch=False,
                 device_mesh=self.device_mesh,
                 cpu_offload=None,
@@ -1154,7 +1152,11 @@ class RewardModelWorker(Worker):
         import torch.distributed
 
         if not torch.distributed.is_initialized():
-            torch.distributed.init_process_group(backend="nccl" if is_cuda_available else "hccl")
+            local_rank = int(os.environ.get("LOCAL_RANK", 0))
+            rank = int(os.environ.get("RANK", 0))
+            world_size = int(os.environ.get("WORLD_SIZE", 1))
+            torch.cuda.set_device(local_rank)
+            torch.distributed.init_process_group(backend="nccl" if is_cuda_available else "hccl", rank=rank, world_size=world_size)
         self.config = config
 
         # build device mesh for Ulysses Sequence Parallel
@@ -1202,10 +1204,7 @@ class RewardModelWorker(Worker):
         model_config.num_labels = 1
 
         # note that we have to create model in fp32. Otherwise, the optimizer is in bf16, which is incorrect
-        init_context = get_init_weight_context_manager(
-            use_meta_tensor=not model_config.tie_word_embeddings and config.strategy != "fsdp",
-            mesh=self.device_mesh,
-        )
+        init_context = get_init_weight_context_manager(use_meta_tensor=not model_config.tie_word_embeddings, mesh=self.device_mesh)
 
         with init_context(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -1239,7 +1238,7 @@ class RewardModelWorker(Worker):
                 auto_wrap_policy=auto_wrap_policy,
                 device_id=get_torch_device().current_device(),
                 sharding_strategy=sharding_strategy,  # zero3
-                sync_module_states=False,  # Disabled: all ranks loaded full weights independently (MIG fix)
+                sync_module_states=True,
                 cpu_offload=CPUOffload(offload_params=True),
                 forward_prefetch=False,
                 device_mesh=self.device_mesh,

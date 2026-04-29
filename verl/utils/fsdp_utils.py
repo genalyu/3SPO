@@ -393,12 +393,12 @@ def get_fsdp_state_ctx(model, state_type, state_cfg, optim_cfg):
 
 def fsdp2_load_full_state_dict(model: torch.nn.Module, full_state: dict, device_mesh=None, cpu_offload=None):
     """
-    Loads the full state dict into the sharded model. Each rank loads the full state
-    dict independently to avoid NCCL broadcast which can hang in MIG environments.
+    Loads the full state dict (could be only on rank 0) into the sharded model. This is done by broadcasting the
+    parameters from rank 0 to all other ranks. This function modifies the model in-place.
 
     Args:
         model (`torch.nn.Module`): The model to load the state dict into
-        full_state (`dict`): The full state dict to load
+        full_state (`dict`): The full state dict to load, can only be on rank 0
     """
     from torch.distributed.checkpoint.state_dict import StateDictOptions, set_model_state_dict
 
@@ -409,9 +409,7 @@ def fsdp2_load_full_state_dict(model: torch.nn.Module, full_state: dict, device_
         model = model.to_empty(device=torch.cuda.current_device())
 
     cpu_offload = cpu_offload is not None
-    # Use broadcast_from_rank0=False: each rank loads the full state dict independently,
-    # avoiding NCCL broadcast which can hang in MIG environments.
-    options = StateDictOptions(full_state_dict=True, cpu_offload=cpu_offload, broadcast_from_rank0=False)
+    options = StateDictOptions(full_state_dict=True, cpu_offload=cpu_offload, broadcast_from_rank0=True)
     set_model_state_dict(model, full_state, options=options)
 
     # rotary_emb is not in state_dict, so we need to broadcast it manually

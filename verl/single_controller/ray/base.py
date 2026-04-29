@@ -444,19 +444,14 @@ class RayWorkerGroup(WorkerGroup):
                     "ASCEND_VISIBLE_DEVICES": "",
                 }
                 
-                # Manual MIG isolation: pick only the UUID for this local rank
-                cvd_val = all_visible_devices
-                if cvd_val:
-                    cvd_list = cvd_val.split(",")
-                    if len(cvd_list) > local_rank:
-                        # Assign only the specific MIG partition to this rank
-                        env_vars["CUDA_VISIBLE_DEVICES"] = cvd_list[local_rank]
-                        # Some frameworks use these as fallback
-                        env_vars["NVIDIA_VISIBLE_DEVICES"] = cvd_list[local_rank]
-                        # Once visibility is restricted to a single MIG UUID,
-                        # the process should treat it as cuda:0.
-                        env_vars["LOCAL_RANK"] = "0"
-                        env_vars["RAY_LOCAL_RANK"] = "0"
+                # In MIG mode, let ALL ranks see ALL MIG UUIDs so NCCL can correctly
+                # detect they are on the same physical node (nNodes=1).
+                # Each rank will use torch.cuda.set_device(local_rank) to select its own MIG.
+                # Keeping all MIGs visible avoids NCCL's topology detection incorrectly
+                # classifying single-machine MIGs as separate nodes.
+                if "MIG-" in all_visible_devices and all_visible_devices.count("MIG-") >= local_world_size:
+                    env_vars["CUDA_VISIBLE_DEVICES"] = all_visible_devices
+                    env_vars["NVIDIA_VISIBLE_DEVICES"] = all_visible_devices
                 
                 # Debug: Log the env vars being passed
                 print(f"DEBUG: Rank {rank} Local Rank {local_rank} env_vars: {env_vars}", flush=True)
