@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=alfworld_grpo
+#SBATCH --job-name=grpo
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
