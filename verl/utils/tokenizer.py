@@ -48,6 +48,8 @@ def hf_tokenizer(name_or_path, correct_pad_token=True, correct_gemma2=True, **kw
 
     """
     from transformers import AutoTokenizer
+    import os
+    print(f"[MIG-DBG] hf_tokenizer called with path={name_or_path}, pid={os.getpid()}, rank={os.environ.get('RANK','?')}", flush=True)
 
     if correct_gemma2 and isinstance(name_or_path, str) and "gemma-2-2b-it" in name_or_path:
         # the EOS token in gemma2 is ambiguious, which may worsen RL performance.
@@ -70,14 +72,19 @@ def hf_processor(name_or_path, **kwargs):
     Returns:
         transformers.ProcessorMixin: The pretrained processor.
     """
+    import os
     from transformers import AutoProcessor
-
+    print(f"[MIG-DBG] hf_processor called with path={name_or_path}, pid={os.getpid()}, rank={os.environ.get('RANK','?')}", flush=True)
     try:
+        print(f"[MIG-DBG] hf_processor calling AutoProcessor.from_pretrained", flush=True)
         processor = AutoProcessor.from_pretrained(name_or_path, **kwargs)
-    except Exception:
+        print(f"[MIG-DBG] hf_processor AutoProcessor.from_pretrained returned, type={type(processor)}", flush=True)
+    except Exception as e:
+        print(f"[MIG-DBG] hf_processor caught exception: {e}", flush=True)
         processor = None
     # Avoid load tokenizer, see:
     # https://github.com/huggingface/transformers/blob/v4.49.0/src/transformers/models/auto/processing_auto.py#L344
     if processor is not None and "Processor" not in processor.__class__.__name__:
         processor = None
+    print(f"[MIG-DBG] hf_processor returning processor={processor}", flush=True)
     return processor
