@@ -203,7 +203,7 @@ class ActorRolloutRefWorker(Worker):
         from verl.utils.torch_dtypes import PrecisionType
 
         assert role in ["actor", "ref"]
-        print(f"[MIG-DBG] {role} rank={self.rank} entering _build_model_optimizer, local_path={local_path}", flush=True)
+        print(f"[MIG-DBG] {role} rank={self.rank} entering _build_model_optimizer, model_path={model_path}", flush=True)
 
         log_gpu_memory_usage(f"Before init {role} from HF AutoModel", logger=logger)
         local_path = model_path
