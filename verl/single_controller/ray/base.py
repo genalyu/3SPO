@@ -281,8 +281,10 @@ class RayClassWithInitArgs(ClassWithInitArgs):
                     if "env_vars" not in options["runtime_env"]:
                         options["runtime_env"]["env_vars"] = {}
 
+                    # Force override CUDA_VISIBLE_DEVICES to single MIG UUID
                     options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
                     options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
+                    print(f"DEBUG [create_actor]: bundle_idx={placement_group_bundle_idx}, setting CUDA_VISIBLE_DEVICES={my_mig_uuid}", flush=True)
 
                 # In MIG mode, let the placement group reserve the GPU-shaped bundle
                 # and rely on manually injected CUDA_VISIBLE_DEVICES for isolation.
@@ -449,9 +451,7 @@ class RayWorkerGroup(WorkerGroup):
                 # NCCL contention between different worker groups.
                 if "MIG-" in all_visible_devices and all_visible_devices.count("MIG-") >= local_world_size:
                     env_vars["NVIDIA_VISIBLE_DEVICES"] = all_visible_devices
-                
-                # Debug: Log the env vars being passed
-                print(f"DEBUG: Rank {rank} Local Rank {local_rank} env_vars: {env_vars}", flush=True)
+
                 if rank != 0:
                     env_vars["MASTER_ADDR"] = self._master_addr
                     env_vars["MASTER_PORT"] = self._master_port

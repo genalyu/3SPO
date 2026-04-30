@@ -115,11 +115,10 @@ class ActorRolloutRefWorker(Worker):
 
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                # Each process sees only its own MIG UUID, so device is always 0
                 device_idx = 0
             else:
                 device_idx = local_rank
-
+            print(f"[MIG-DBG] {self.__class__.__name__} rank={rank} CUDA_VISIBLE_DEVICES={cuda_visible_devices} device_idx={device_idx}", flush=True)
             torch.cuda.set_device(device_idx)
             torch.distributed.init_process_group(
                 backend="nccl", rank=rank, world_size=world_size,
@@ -824,11 +823,11 @@ class CriticWorker(Worker):
 
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                # Each process sees only its own MIG UUID, so device is always 0
                 device_idx = 0
             else:
                 device_idx = local_rank
 
+            print(f"[MIG-DBG] {self.__class__.__name__} rank={rank} CUDA_VISIBLE_DEVICES={cuda_visible_devices} device_idx={device_idx}", flush=True)
             torch.cuda.set_device(device_idx)
             torch.distributed.init_process_group(
                 backend="nccl", rank=rank, world_size=world_size,
@@ -1177,10 +1176,10 @@ class RewardModelWorker(Worker):
 
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                # Each process sees only its own MIG UUID, so device is always 0
                 device_idx = 0
             else:
                 device_idx = local_rank
+            print(f"[MIG-DBG] {self.__class__.__name__} rank={rank} CUDA_VISIBLE_DEVICES={cuda_visible_devices} device_idx={device_idx}", flush=True)
             torch.cuda.set_device(device_idx)
             torch.distributed.init_process_group(
                 backend="nccl" if is_cuda_available else "hccl",
