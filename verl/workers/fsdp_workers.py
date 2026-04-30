@@ -239,6 +239,7 @@ class ActorRolloutRefWorker(Worker):
 
         # NOTE(fix me): tie_word_embedding causes meta_tensor init to hang
         init_context = get_init_weight_context_manager(use_meta_tensor=not actor_model_config.tie_word_embeddings, mesh=self.device_mesh)
+        print(f"[MIG-DBG] {role} rank={self.rank} about to call from_pretrained", flush=True)
 
         with init_context(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -291,7 +292,9 @@ class ActorRolloutRefWorker(Worker):
                     'bias': "none"
                 }
                 actor_module = get_peft_model(actor_module, LoraConfig(**lora_config))
+        print(f"[MIG-DBG] {role} rank={self.rank} about to call barrier, world_size={torch.distributed.get_world_size()}", flush=True)
         torch.distributed.barrier()
+        print(f"[MIG-DBG] {role} rank={self.rank} barrier passed", flush=True)
 
         if self.rank == 0:
             print_model_size(actor_module)
