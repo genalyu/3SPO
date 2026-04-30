@@ -120,8 +120,12 @@ class ActorRolloutRefWorker(Worker):
                 device_idx = rank % num_migs
             else:
                 device_idx = local_rank
+
             torch.cuda.set_device(device_idx)
-            torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
+            torch.distributed.init_process_group(
+                backend="nccl", rank=rank, world_size=world_size,
+                device_id=device_idx,
+            )
 
         # build device mesh for FSDP
         world_size = torch.distributed.get_world_size()
@@ -826,8 +830,12 @@ class CriticWorker(Worker):
                 device_idx = rank % num_migs
             else:
                 device_idx = local_rank
+
             torch.cuda.set_device(device_idx)
-            torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
+            torch.distributed.init_process_group(
+                backend="nccl", rank=rank, world_size=world_size,
+                device_id=device_idx,
+            )
         self.config = config
 
         # build device mesh for Ulysses Sequence Parallel
@@ -1177,7 +1185,12 @@ class RewardModelWorker(Worker):
             else:
                 device_idx = local_rank
             torch.cuda.set_device(device_idx)
-            torch.distributed.init_process_group(backend="nccl" if is_cuda_available else "hccl", rank=rank, world_size=world_size)
+            torch.distributed.init_process_group(
+                backend="nccl" if is_cuda_available else "hccl",
+                rank=rank,
+                world_size=world_size,
+                device_id=device_idx,
+            )
         self.config = config
 
         # build device mesh for Ulysses Sequence Parallel

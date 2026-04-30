@@ -86,8 +86,17 @@ class ActorRolloutRefWorker(MegatronWorker):
         # 3. and apply the following patch in ray==2.10, https://github.com/ray-project/ray/pull/44385
         if not torch.distributed.is_initialized():
             rank = int(os.environ["LOCAL_RANK"])
-            torch.distributed.init_process_group(backend="nccl")
-            torch.cuda.set_device(rank)
+
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
+                num_migs = len(mig_uuids)
+                device_idx = rank % num_migs
+            else:
+                device_idx = rank
+
+            torch.distributed.init_process_group(backend="nccl", device_id=device_idx)
+            torch.cuda.set_device(device_idx)
 
             if self.config.actor.megatron.sequence_parallel:
                 os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
@@ -550,8 +559,17 @@ class CriticWorker(MegatronWorker):
         # 3. and apply the following patch in ray==2.10, https://github.com/ray-project/ray/pull/44385
         if not torch.distributed.is_initialized():
             rank = int(os.environ["LOCAL_RANK"])
-            torch.distributed.init_process_group(backend="nccl")
-            torch.cuda.set_device(rank)
+
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
+                num_migs = len(mig_uuids)
+                device_idx = rank % num_migs
+            else:
+                device_idx = rank
+
+            torch.distributed.init_process_group(backend="nccl", device_id=device_idx)
+            torch.cuda.set_device(device_idx)
 
             if self.config.megatron.sequence_parallel:
                 os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
@@ -756,8 +774,17 @@ class RewardModelWorker(MegatronWorker):
         # 3. and apply the following patch in ray==2.10, https://github.com/ray-project/ray/pull/44385
         if not torch.distributed.is_initialized():
             rank = int(os.environ["LOCAL_RANK"])
-            torch.distributed.init_process_group(backend="nccl")
-            torch.cuda.set_device(rank)
+
+            cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+            if "MIG-" in cuda_visible_devices:
+                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
+                num_migs = len(mig_uuids)
+                device_idx = rank % num_migs
+            else:
+                device_idx = rank
+
+            torch.distributed.init_process_group(backend="nccl", device_id=device_idx)
+            torch.cuda.set_device(device_idx)
 
             if self.config.megatron.sequence_parallel:
                 os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
