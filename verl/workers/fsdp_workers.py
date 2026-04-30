@@ -519,6 +519,7 @@ class ActorRolloutRefWorker(Worker):
 
     @register(dispatch_mode=Dispatch.ONE_TO_ALL)
     def init_model(self):
+        print(f"[MIG-DBG] init_model START rank={self.rank} pid={os.getpid()}", flush=True)
         from verl.workers.actor import DataParallelPPOActor
 
         # This is used to import external_lib into the huggingface systems
@@ -531,8 +532,10 @@ class ActorRolloutRefWorker(Worker):
         use_remove_padding = self.config.model.get("use_remove_padding", False)
         use_shm = self.config.model.get('use_shm', False)
         use_fused_kernels = self.config.model.get("use_fused_kernels", False)
+        print(f"[MIG-DBG] init_model rank={self.rank} _is_actor={self._is_actor} _is_ref={self._is_ref}", flush=True)
 
         if self._is_actor or self._is_rollout:
+            print(f"[MIG-DBG] init_model rank={self.rank} entering actor branch", flush=True)
             # we need the model for actor and rollout
             if self._is_actor:
                 optim_config = self.config.actor.optim
@@ -581,10 +584,13 @@ class ActorRolloutRefWorker(Worker):
             self.actor = DataParallelPPOActor(config=self.config.actor, actor_module=self.actor_module_fsdp, actor_optimizer=self.actor_optimizer)
 
         if self._is_rollout:
+            print(f"[MIG-DBG] init_model rank={self.rank} entering rollout branch", flush=True)
             self.rollout, self.rollout_sharding_manager = self._build_rollout(trust_remote_code=self.config.model.get("trust_remote_code", False))
 
         if self._is_ref:
+            print(f"[MIG-DBG] init_model rank={self.rank} entering ref branch, about to copy_to_local", flush=True)
             local_path = copy_to_local(self.config.model.path, use_shm=use_shm)
+            print(f"[MIG-DBG] init_model rank={self.rank} copy_to_local done, calling _build_model_optimizer for ref", flush=True)
             self.ref_module_fsdp = self._build_model_optimizer(
                 model_path=local_path,
                 fsdp_config=self.config.ref.fsdp_config,
