@@ -203,14 +203,18 @@ class ActorRolloutRefWorker(Worker):
         from verl.utils.torch_dtypes import PrecisionType
 
         assert role in ["actor", "ref"]
+        print(f"[MIG-DBG] {role} rank={self.rank} entering _build_model_optimizer, local_path={local_path}", flush=True)
 
         log_gpu_memory_usage(f"Before init {role} from HF AutoModel", logger=logger)
         local_path = model_path
 
         # note that we have to create model in fp32. Otherwise, the optimizer is in bf16, which is incorrect
         # TODO(zhangchi.usc1992): 1. support create from random initialized model. 2. Support init with FSDP directly
+        print(f"[MIG-DBG] {role} rank={self.rank} calling hf_tokenizer", flush=True)
         self.tokenizer = hf_tokenizer(local_path, trust_remote_code=trust_remote_code)
+        print(f"[MIG-DBG] {role} rank={self.rank} hf_tokenizer done, calling hf_processor", flush=True)
         self.processor = hf_processor(local_path, trust_remote_code=trust_remote_code)
+        print(f"[MIG-DBG] {role} rank={self.rank} hf_processor done, calling AutoConfig", flush=True)
 
         torch_dtype = fsdp_config.get("model_dtype", None)
         if torch_dtype is None:
