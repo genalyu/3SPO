@@ -272,24 +272,17 @@ class RayClassWithInitArgs(ClassWithInitArgs):
             if "MIG-" in all_mig_ids:
                 mig_uuids = [id.strip() for id in all_mig_ids.split(",") if "MIG-" in id]
                 if mig_uuids:
-                    # Check if CUDA_VISIBLE_DEVICES was already set to all MIG UUIDs
-                    # by _init_with_resource_pool. In this case, keep it as-is so that
-                    # NCCL can see all devices for correct topology detection (nNodes=1).
-                    # Each rank will use torch.cuda.set_device(rank % num_migs) to select
-                    # its own MIG device.
-                    existing_cvd = options.get("runtime_env", {}).get("env_vars", {}).get("CUDA_VISIBLE_DEVICES", "")
-                    if "MIG-" not in existing_cvd:
-                        # Not already set: partition to a single MIG for this bundle
-                        my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
+                    # Each process gets its own MIG UUID to avoid NCCL contention
+                    # between different worker groups sharing the same physical devices.
+                    my_mig_uuid = mig_uuids[placement_group_bundle_idx % len(mig_uuids)]
 
-                        if "runtime_env" not in options:
-                            options["runtime_env"] = {}
-                        if "env_vars" not in options["runtime_env"]:
-                            options["runtime_env"]["env_vars"] = {}
+                    if "runtime_env" not in options:
+                        options["runtime_env"] = {}
+                    if "env_vars" not in options["runtime_env"]:
+                        options["runtime_env"]["env_vars"] = {}
 
-                        options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
-                        options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
-                        # print(f"DEBUG [base.py]: Partitioned MIG {my_mig_uuid} for bundle {placement_group_bundle_idx}", flush=True)
+                    options["runtime_env"]["env_vars"]["CUDA_VISIBLE_DEVICES"] = my_mig_uuid
+                    options["runtime_env"]["env_vars"]["NVIDIA_VISIBLE_DEVICES"] = my_mig_uuid
 
                 # In MIG mode, let the placement group reserve the GPU-shaped bundle
                 # and rely on manually injected CUDA_VISIBLE_DEVICES for isolation.
@@ -449,14 +442,12 @@ class RayWorkerGroup(WorkerGroup):
                     "ROCR_VISIBLE_DEVICES": "",
                     "ASCEND_VISIBLE_DEVICES": "",
                 }
-                
-                # In MIG mode, let ALL ranks see ALL MIG UUIDs so NCCL can correctly
-                # detect they are on the same physical node (nNodes=1).
-                # Each rank will use torch.cuda.set_device(local_rank) to select its own MIG.
-                # Keeping all MIGs visible avoids NCCL's topology detection incorrectly
-                # classifying single-machine MIGs as separate nodes.
+
+                # MIG mode: CUDA_VISIBLE_DEVICES will be set per-bundle in
+                # create_actor() to give each process its own MIG UUID.
+                # Don't override it here with the full list — that causes
+                # NCCL contention between different worker groups.
                 if "MIG-" in all_visible_devices and all_visible_devices.count("MIG-") >= local_world_size:
-                    env_vars["CUDA_VISIBLE_DEVICES"] = all_visible_devices
                     env_vars["NVIDIA_VISIBLE_DEVICES"] = all_visible_devices
                 
                 # Debug: Log the env vars being passed

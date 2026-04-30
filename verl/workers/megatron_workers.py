@@ -89,9 +89,8 @@ class ActorRolloutRefWorker(MegatronWorker):
 
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
-                num_migs = len(mig_uuids)
-                device_idx = rank % num_migs
+                # Each process sees only its own MIG UUID, so device is always 0
+                device_idx = 0
             else:
                 device_idx = rank
 
@@ -562,9 +561,8 @@ class CriticWorker(MegatronWorker):
 
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
-                num_migs = len(mig_uuids)
-                device_idx = rank % num_migs
+                # Each process sees only its own MIG UUID, so device is always 0
+                device_idx = 0
             else:
                 device_idx = rank
 
@@ -777,9 +775,8 @@ class RewardModelWorker(MegatronWorker):
 
             cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
             if "MIG-" in cuda_visible_devices:
-                mig_uuids = [x.strip() for x in cuda_visible_devices.split(",") if "MIG-" in x]
-                num_migs = len(mig_uuids)
-                device_idx = rank % num_migs
+                # Each process sees only its own MIG UUID, so device is always 0
+                device_idx = 0
             else:
                 device_idx = rank
 
