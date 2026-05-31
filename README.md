@@ -1,4 +1,4 @@
-# 3SPO: Three-Step Preference Optimization
+# 3SPO: State-Score-Supervised Policy Optimization
 
 [![Paper](https://img.shields.io/badge/arXiv-3SPO-blue)](https://arxiv.org/abs/XXXX.XXXXX)
 
