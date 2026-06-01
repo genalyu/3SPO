@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate verl-agent-alf
 ENGINE=${1:-vllm}
@@ -7,6 +8,7 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 
 export HF_ENDPOINT=https://hf-mirror.com
 TRAIN_GPUS_PER_NODE=2
+ROLLOUT_TP_SIZE=2
 num_cpus_per_env_worker=0.1
 
 train_data_size=8

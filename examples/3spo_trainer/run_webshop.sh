@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 ENGINE=${1:-vllm}
 ulimit -u 65536
 export VLLM_ATTENTION_BACKEND=XFORMERS

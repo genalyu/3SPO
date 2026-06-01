@@ -1,10 +1,12 @@
 #!/bin/bash
 set -x
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate verl-agent-alf
 ENGINE=${1:-vllm}
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
+export HF_ENDPOINT=https://hf-mirror.com
 TRAIN_GPUS_PER_NODE=8
 num_cpus_per_env_worker=0.1
 
@@ -76,9 +78,9 @@ omega_k=0.1
 #     env.resources_per_worker.num_cpus=$num_cpus_per_env_worker \
 #     trainer.critic_warmup=0 \
 #     trainer.logger=['console','wandb'] \
-#     trainer.project_name='verl_agent_alfworld' \
-#     trainer.experiment_name='3spo_qwen2.5_7b' \
-#     trainer.n_gpus_per_node=4 \
+#     trainer.project_name='3spo_qwen2.5_7b_alf' \
+#     trainer.experiment_name='3spo_qwen2.5_7b_alf' \
+#     trainer.n_gpus_per_node=8 \
 #     trainer.nnodes=1 \
 #     trainer.save_freq=100 \
 #     trainer.test_freq=50 \

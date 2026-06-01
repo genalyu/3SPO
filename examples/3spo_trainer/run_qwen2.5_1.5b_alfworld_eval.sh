@@ -1,4 +1,6 @@
+#!/bin/bash
 set -x
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate verl-agent-alf
 ENGINE=${1:-vllm}
