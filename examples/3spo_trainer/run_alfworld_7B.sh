@@ -18,10 +18,9 @@ mode="mean_std_norm"
 model_path="/public/home/genalyu/models/Qwen2.5-7B-Instruct"
 
 # 3SPO Parameters
-alpha=1.0
+alpha=50
 xi=10
 zeta=0.1
-beta=5.0
 omega_k=0.1
 
 # python3 -m examples.data_preprocess.prepare \
@@ -34,7 +33,6 @@ omega_k=0.1
 #     +algorithm.spo3_alpha=$alpha \
 #     +algorithm.spo3_xi=$xi \
 #     +algorithm.spo3_zeta=$zeta \
-#     +algorithm.spo3_beta=$beta \
 #     +algorithm.spo3_omega_k=$omega_k \
 #     data.train_files=$HOME/data/verl-agent/text/train.parquet \
 #     data.val_files=$HOME/data/verl-agent/text/test.parquet \
@@ -91,7 +89,6 @@ python3 -m gigpo.main_3spo \
     +algorithm.spo3_alpha=$alpha \
     +algorithm.spo3_xi=$xi \
     +algorithm.spo3_zeta=$zeta \
-    +algorithm.spo3_beta=$beta \
     +algorithm.spo3_omega_k=$omega_k \
     data.train_files=$HOME/data/verl-agent/text/train.parquet \
     data.val_files=$HOME/data/verl-agent/text/test.parquet \

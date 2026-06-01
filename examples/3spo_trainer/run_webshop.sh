@@ -1,6 +1,8 @@
 #!/bin/bash
 set -x
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate verl-agent-alf
 ENGINE=${1:-vllm}
 ulimit -u 65536
 export VLLM_ATTENTION_BACKEND=XFORMERS
@@ -13,10 +15,9 @@ group_size=8
 mode="mean_norm"
 
 # 3SPO Parameters
-alpha=1.0
+alpha=50
 xi=10
 zeta=0.1
-beta=5.0
 omega_k=0.1
 
 python3 -m examples.data_preprocess.prepare \
@@ -26,11 +27,10 @@ python3 -m examples.data_preprocess.prepare \
 
 python3 -m gigpo.main_3spo \
     algorithm.adv_estimator=grpo \
-    algorithm.spo3_alpha=$alpha \
-    algorithm.spo3_xi=$xi \
-    algorithm.spo3_zeta=$zeta \
-    algorithm.spo3_beta=$beta \
-    algorithm.spo3_omega_k=$omega_k \
+    +algorithm.spo3_alpha=$alpha \
+    +algorithm.spo3_xi=$xi \
+    +algorithm.spo3_zeta=$zeta \
+    +algorithm.spo3_omega_k=$omega_k \
     data.train_files=$HOME/data/verl-agent/text/train.parquet \
     data.val_files=$HOME/data/verl-agent/text/test.parquet \
     data.train_batch_size=$train_data_size \

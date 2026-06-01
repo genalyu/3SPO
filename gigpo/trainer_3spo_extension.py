@@ -66,7 +66,7 @@ class SPO3TrajectoryCollector(TrajectoryCollector):
                 r = compute_3spo_step_reward(
                     s_t_obs=current_state['anchor'][0],
                     s_next_obs=next_obs['anchor'][i],
-                    r_osworld=rewards[i],
+                    r_success=rewards[i],
                     state_manager=self.state_manager
                 )
                 step_rewards.append(r)

@@ -21,7 +21,7 @@ def main(config):
     
     # 2. 初始化 3SPO 核心状态管理器
     state_manager = StateScoreManager(
-        alpha=config.algorithm.get("spo3_alpha", 1.0),
+        alpha=config.algorithm.get("spo3_alpha", 50.0),
         xi=config.algorithm.get("spo3_xi", 10.0),
         zeta=config.algorithm.get("spo3_zeta", 0.1)
     )

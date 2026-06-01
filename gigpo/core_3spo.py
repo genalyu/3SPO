@@ -27,20 +27,18 @@ class StateScoreManager:
     Manages historical interaction statistics and computes Dynamic State-Score S(st).
     Supports persistent storage to share state statistics globally across tasks and trajectories.
     """
-    def __init__(self, 
-                 alpha: float = 1.0, 
-                 xi: float = 10.0, 
-                 zeta: float = 0.1, 
+    def __init__(self,
+                 alpha: float = 1.0,
+                 xi: float = 10.0,
+                 zeta: float = 0.1,
                  epsilon: float = 1e-6,
                  g_max: int = 8,
-                 beta: float = 5.0,
                  persistence_path: str = "state_stats.json"):
         self.alpha = alpha
         self.xi = xi
         self.zeta = zeta
         self.epsilon = epsilon
         self.g_max = g_max
-        self.beta = beta
         self.persistence_path = persistence_path
         
         # Load existing stats if file exists
@@ -101,7 +99,7 @@ class StateScoreManager:
             return 1.0  # Learning potential is high for unseen states
         
         success_rate = n_success / (n_total + self.epsilon)
-        lambda_t = self.alpha * np.log(self.t + 1)
+        lambda_t = self.alpha * np.log(self.t)
         
         # Indicator function: (N_fail < xi) OR (SuccessRate > zeta)
         indicator = (n_fail < self.xi) or (success_rate > self.zeta)
@@ -116,44 +114,44 @@ class StateScoreManager:
     def get_n_rollouts(self, state_hash) -> int:
         """
         Compute n(st) according to Equation 3.
-        n(st) = floor(G_max * Sigmoid(beta * S(st)))
+        n(st) = ceil(G_max * S(st))
+        n=0 truncates the trajectory, n=1 proceeds without policy optimization.
         """
         score = self.get_score(state_hash)
-        # Sigmoid(beta * S(st))
-        sig = 1.0 / (1.0 + np.exp(-self.beta * score))
-        n = int(np.floor(self.g_max * sig))
-        return max(1, n)
+        n = int(np.ceil(self.g_max * score))
+        return n
 
-    def get_omega(self, state_hash, k: float = 0.1) -> float:
+    def get_omega(self, state_hash, omega_k: float = 0.1) -> float:
         """
         Compute w(N_total(st)) used in Equation 2.
+        w(N) = 0.5 * exp(-omega_k * N)
         """
         n_total = self.stats[state_hash]["n_total"]
-        return float(np.exp(-k * n_total))
+        return float(0.5 * np.exp(-omega_k * n_total))
 
 def compute_3spo_step_reward(
     s_t_obs: Any,
     s_next_obs: Any,
-    r_osworld: float,
+    r_success: float,
     state_manager: StateScoreManager,
     omega_k: float = 0.1
 ) -> float:
     """
-    Compute the multi-dimensional composite reward R_3SPO(st, st+1).
+    Compute the step-wise composite reward R_3SPO(st, st+1).
     Equation 2:
-    R_3SPO = w(N_total)*R_novel + (0.5 - w(N_total))*(S(st) - S(st+1)) + 0.5*R_osworld
+    R_3SPO = w(N)*R_novel + (0.5 - w(N))*(S(st) - S(st+1)) + 0.5*R_success
     """
     h_t = to_hashable(s_t_obs)
     h_next = to_hashable(s_next_obs)
-    
+
     # R_novel: 1 if state changed, else 0
     r_novel = 1.0 if h_t != h_next else 0.0
-    
-    w = state_manager.get_omega(h_t, k=omega_k)
+
+    w = state_manager.get_omega(h_t, omega_k=omega_k)
     s_t = state_manager.get_score(h_t)
     s_next = state_manager.get_score(h_next)
-    
-    reward = w * r_novel + (0.5 - w) * (s_t - s_next) + 0.5 * r_osworld
+
+    reward = w * r_novel + (0.5 - w) * (s_t - s_next) + 0.5 * r_success
     return reward
 
 def compute_3spo_advantage(
