@@ -25,7 +25,7 @@ Most trajectory-level RLHF methods (GRPO / PPO / DPO) apply policy optimization 
 </p>
 
 The framework operates in a closed loop:
-1. **Agent-Env Interaction**: The agent interacts with the environment, generating trajectories from a starting state.
+1. **Agent-Env Interaction**: The agent interacts with the environment, generating trajectories.
 2. **Adaptive Rollout**: Based on historical state scores, harder states receive more rollout attempts ($n = \lceil G_{\max} \cdot S(s) \rceil$).
 3. **Step-Wise Reward Model**: Each transition is scored by combining novelty ($R_{novel}$), state-score difference ($S(s_t) - S(s_{t+1})$), and task success (✓/✗).
 4. **Group Comparison**: Relative advantage is computed within each group for stable training.
@@ -91,7 +91,7 @@ n(s_t) = ⌈G_max · S(s_t)⌉
   <img src="docs/3spo/fig3_training_curves.jpg" width="100%" alt="Training success rate curves"/>
 </p>
 
-Training success rate over epochs on ALFWorld. 3SPO (blue) reaches near-perfect success (~97%) significantly faster than baselines, demonstrating the benefit of step-level supervision and adaptive rollout allocation.
+Training success rate over epochs on ALFWorld.  3SPO (Blue) reaches near-perfect success (~97%) significantly faster than baselines, demonstrating the benefit of step-level supervision and adaptive rollout allocation.
 
 ### Case Study: Adaptive Behavior in Action
 
@@ -100,10 +100,8 @@ Training success rate over epochs on ALFWorld. 3SPO (blue) reaches near-perfect 
 </p>
 
 This example from the ALFWorld kitchen task shows how 3SPO adapts over time:
-- **1st visit to s₇** (state score = 1.0): The state is novel, so 3SPO allocates maximum rollouts (n=8), explores diverse actions (Find Barbecue, Go to Bathroom, Pick up Fork…), and uses novelty-weighted rewards to guide learning.
-- **10th visit to s₇** (state score = 0.3): The state is now familiar (success rate improved), so rollouts drop to n=3. The reward model shifts from novelty-driven to score-difference-driven, focusing refinement on the most promising transition (Pick up Apple).
-
-This dynamic behavior is the core of 3SPO — **resources automatically flow from solved states to hard ones** throughout training.
+- **1st visit to s₇** : The state is novel, so 3SPO allocates maximum rollouts (n=8), explores diverse actions (Find Barbecue, Go to Bathroom, Pick up Fork…), and uses novelty-weighted rewards to guide learning.
+- **10th visit to s₇** : The state is now familiar (success rate improved), so rollouts drop to n=3. The reward model shifts from novelty-driven to score-difference-driven, focusing refinement on the most promising transition (Pick up Apple).
 
 ## Requirements
 
