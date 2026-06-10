@@ -1,6 +1,6 @@
 # 3SPO: State-Score-Supervised Policy Optimization
 
-[![Paper](https://img.shields.io/badge/arXiv-3SPO-blue)](https://arxiv.org/abs/XXXX.XXXXX)
+[![Paper](https://img.shields.io/badge/arXiv-3SPO-blue)](https://arxiv.org/abs/2606.09961)
 
 ## Algorithm
 
