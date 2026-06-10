@@ -2,9 +2,35 @@
 
 [![Paper](https://img.shields.io/badge/arXiv-3SPO-blue)](https://arxiv.org/abs/2606.09961)
 
+## Motivation: From Post-Trajectory to Post-Step Optimization
+
+Most trajectory-level RLHF methods (GRPO / PPO / DPO) apply policy optimization only after a full trajectory completes — treating all intermediate states equally. 3SPO shifts to **post-step policy optimization**, assigning credit at every state transition and allocating more rollouts to harder states. The figure below illustrates the paradigm shift:
+
+<p align="center">
+  <img src="docs/3spo/fig1_comparison.jpg" width="100%" alt="Comparison of Post-Traj vs Post-Step optimization paradigms"/>
+</p>
+
+- **Left**: Post-Traj Policy Opt (GRPO)— one update after the entire trajectory; intermediate states receive no fine-grained signal.
+- **Middle**: Naïve Post-Traj Policy Opt (GiGPO) — GiGPO introduces state-level grouping but still performs post-trajectory policy optimization.
+- **Right**: Post-Step Policy Opt (3SPO)— 3SPO computes a continuous state score from historical interaction statistics that simultaneously supervises step-wise credit assignment and adaptive rollout allocation, enabling post-step policy optimization.
+
 ## Algorithm
 
 3SPO converts sparse trajectory-level rewards into fine-grained step-level supervision through a dynamic state-score mechanism. The repository is the **first** post-step GRPO code framework based on verl (later expanded to DPO、PPO). 3SPO consists of three key components:
+
+### Overall Framework
+
+<p align="center">
+  <img src="docs/3spo/fig2_framework.jpg" width="100%" alt="3SPO Framework Overview"/>
+</p>
+
+The framework operates in a closed loop:
+1. **Agent-Env Interaction**: The agent interacts with the environment, generating trajectories from a starting state.
+2. **Adaptive Rollout**: Based on historical state scores, harder states receive more rollout attempts ($n = \lceil G_{\max} \cdot S(s) \rceil$).
+3. **Step-Wise Reward Model**: Each transition is scored by combining novelty ($R_{novel}$), state-score difference ($S(s_t) - S(s_{t+1})$), and task success (✓/✗).
+4. **Group Comparison**: Relative advantage is computed within each group for stable training.
+5. **Post-Step Policy Opt**: The policy is updated at every step, not just at trajectory end.
+6. **Update State History**: Success/failure records are written back, dynamically adjusting future state scores.
 
 ### 1. Dynamic State Score
 
@@ -56,6 +82,28 @@ n(s_t) = ⌈G_max · S(s_t)⌉
 | `spo3_zeta` | ζ | 0.1 | Min success rate threshold |
 | `spo3_omega_k` | ω_k | 0.1 | Novelty weight decay rate |
 | `G_max` | — | 8 | Max adaptive rollouts per state |
+
+## Results
+
+### Training Convergence
+
+<p align="center">
+  <img src="docs/3spo/fig3_training_curves.jpg" width="100%" alt="Training success rate curves"/>
+</p>
+
+Training success rate over epochs on ALFWorld. 3SPO (blue) reaches near-perfect success (~97%) significantly faster than baselines, demonstrating the benefit of step-level supervision and adaptive rollout allocation.
+
+### Case Study: Adaptive Behavior in Action
+
+<p align="center">
+  <img src="docs/3spo/fig9_case_study.jpg" width="100%" alt="Case study showing adaptive rollout on ALFWorld kitchen task"/>
+</p>
+
+This example from the ALFWorld kitchen task shows how 3SPO adapts over time:
+- **1st visit to s₇** (state score = 1.0): The state is novel, so 3SPO allocates maximum rollouts (n=8), explores diverse actions (Find Barbecue, Go to Bathroom, Pick up Fork…), and uses novelty-weighted rewards to guide learning.
+- **10th visit to s₇** (state score = 0.3): The state is now familiar (success rate improved), so rollouts drop to n=3. The reward model shifts from novelty-driven to score-difference-driven, focusing refinement on the most promising transition (Pick up Apple).
+
+This dynamic behavior is the core of 3SPO — **resources automatically flow from solved states to hard ones** throughout training.
 
 ## Requirements
 
