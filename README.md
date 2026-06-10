@@ -14,11 +14,7 @@ Most trajectory-level RLHF methods (GRPO / PPO / DPO) apply policy optimization 
 - **Middle**: Naïve Post-Traj Policy Opt (GiGPO) — GiGPO introduces state-level grouping but still performs post-trajectory policy optimization.
 - **Right**: Post-Step Policy Opt (3SPO)— 3SPO computes a continuous state score from historical interaction statistics that simultaneously supervises step-wise credit assignment and adaptive rollout allocation, enabling post-step policy optimization.
 
-## Algorithm
-
-3SPO converts sparse trajectory-level rewards into fine-grained step-level supervision through a dynamic state-score mechanism. The repository is the **first** post-step GRPO code framework based on verl (later expanded to DPO、PPO). 3SPO consists of three key components:
-
-### Overall Framework
+## Method
 
 <p align="center">
   <img src="docs/3spo/fig2_framework.jpg" width="100%" alt="3SPO Framework Overview"/>
@@ -32,6 +28,7 @@ The framework operates in a closed loop:
 5. **Post-Step Policy Opt**: The policy is updated at every step, not just at trajectory end.
 6. **Update State History**: Success/failure records are written back, dynamically adjusting future state scores.
 
+3SPO converts sparse trajectory-level rewards into fine-grained step-level supervision through a dynamic state-score mechanism. The repository is the **first** post-step GRPO code framework based on verl (later expanded to DPO、PPO). 3SPO consists of three key components:
 ### 1. Dynamic State Score
 
 Quantifies the difficulty and learning potential of each state based on historical interaction statistics:
